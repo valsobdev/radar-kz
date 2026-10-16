@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#111111">
+  <title>Radar KZ</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="me" aria-hidden="true"></div>
+
+  <div id="alert" class="hidden" role="alert"></div>
+
+  <div id="limit" class="sign" aria-label="Limite de vitesse">–</div>
+  <div id="speed" aria-label="Vitesse actuelle"><span id="speed-value">0</span><small>km/h</small></div>
+
+  <div id="start">
+    <h1>Radar KZ</h1>
+    <p>Alertes radars et limites de vitesse — Almaty</p>
+    <button id="start-button" type="button">Démarrer</button>
+    <p id="message" class="message"></p>
+    <p class="small">Gardez l'écran allumé. Ne manipulez pas le téléphone en conduisant.</p>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

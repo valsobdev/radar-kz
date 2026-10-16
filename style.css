@@ -1,0 +1,85 @@
+/* Écran de conduite « B » : carte plein écran, limite en bas à gauche, vitesse en bas à droite. */
+:root {
+  --red: #d00000;
+  --ink: #111111;
+  --paper: #ffffff;
+  --blue: #1a73e8;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden; /* pas de défilement de la page */
+  background: #d9e8cf;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink);
+  -webkit-user-select: none;
+  user-select: none;
+}
+#map { position: absolute; inset: 0; }
+
+/* Notre position : flèche bleue fixe au centre, la carte tourne autour */
+#me {
+  position: absolute; left: 50%; top: 50%;
+  width: 0; height: 0;
+  transform: translate(-50%, -60%);
+  border-left: 14px solid transparent;
+  border-right: 14px solid transparent;
+  border-bottom: 30px solid var(--blue);
+  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 1px 3px #0006);
+  pointer-events: none;
+}
+
+/* Bandeau d'alerte en haut */
+#alert {
+  position: absolute; top: max(12px, env(safe-area-inset-top)); left: 12px; right: 12px;
+  background: var(--red); color: #fff;
+  border-radius: 14px; padding: 14px 16px;
+  font-size: 22px; font-weight: 800;
+  box-shadow: 0 3px 10px #0005;
+}
+#alert.hidden { display: none; }
+
+/* Panneau de limite en bas à gauche */
+.sign {
+  position: absolute; left: 14px; bottom: max(18px, env(safe-area-inset-bottom));
+  width: 88px; height: 88px; border-radius: 50%;
+  background: var(--paper); border: 10px solid var(--red);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 34px; font-weight: 900;
+  box-shadow: 0 2px 8px #0005;
+}
+
+/* Vitesse en bas à droite, rouge en cas d'excès */
+#speed {
+  position: absolute; right: 14px; bottom: max(18px, env(safe-area-inset-bottom));
+  min-width: 96px; padding: 6px 12px;
+  background: var(--paper); border-radius: 16px;
+  text-align: center; font-size: 44px; font-weight: 900; line-height: 1;
+  box-shadow: 0 2px 8px #0005;
+}
+#speed small { display: block; font-size: 13px; font-weight: 600; margin-top: 2px; }
+#speed.over { background: var(--red); color: #fff; }
+
+/* Écran de démarrage */
+#start {
+  position: absolute; inset: 0;
+  background: #111111ee; color: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 24px; text-align: center;
+}
+#start.hidden { display: none; }
+#start h1 { margin: 0 0 8px; font-size: 34px; }
+#start-button {
+  margin: 24px 0; padding: 18px 48px;
+  font-size: 26px; font-weight: 800;
+  background: var(--blue); color: #fff; border: 0; border-radius: 16px;
+}
+.message { min-height: 1.4em; color: #ffb4b4; font-weight: 600; }
+.small { font-size: 13px; opacity: 0.8; max-width: 320px; }
+
+/* Icônes des radars sur la carte */
+.cam-marker { font-size: 24px; line-height: 1; filter: drop-shadow(0 1px 2px #0008); }
+
+/* Mention OSM lisible au-dessus du panneau et de la vitesse */
+.maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { bottom: 118px; }

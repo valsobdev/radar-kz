@@ -58,7 +58,7 @@ function speak(text) {
   if (!('speechSynthesis' in window)) return;
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'fr-FR';
-  speechSynthesis.cancel();
+  // Pas de cancel() : une nouvelle annonce attend la fin de la précédente au lieu de la couper.
   speechSynthesis.speak(u);
 }
 function beep() {

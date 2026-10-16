@@ -35,3 +35,16 @@ test('direction inconnue -> alerte', () => {
   assert.ok(createAlertTracker([{ ...cam, directions: [] }]).update({ lat: 43.252, lon: 76.945 }, 180));
 });
 test('cap inconnu -> rien', () => assert.equal(createAlertTracker([cam]).update(south, null), null));
+
+test('bug voix: radars en double (même emplacement) annoncés une seule fois', () => {
+  const twin = { ...cam, id: 'c2', lat: 43.24818 }; // ~20 m après c1
+  const t = createAlertTracker([cam, twin]);
+  assert.equal(t.update(south, 0).camera.id, 'c1');
+  assert.equal(t.update({ lat: 43.24402, lon: 76.945 }, 0), null);
+});
+test('bug voix: un radar à 150 m du précédent reste annoncé', () => {
+  const next = { ...cam, id: 'c3', lat: 43.24935 }; // ~150 m après c1
+  const t = createAlertTracker([cam, next]);
+  t.update(south, 0);
+  assert.equal(t.update({ lat: 43.2450, lon: 76.945 }, 0).camera.id, 'c3');
+});

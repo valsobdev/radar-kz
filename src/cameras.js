@@ -10,6 +10,9 @@ export const ALERT_DISTANCE_M = 500; // on prévient à 500 m
 export const REARM_DISTANCE_M = 600; // au-delà de 600 m, le radar pourra de nouveau déclencher une alerte
 export const AHEAD_CONE_DEG = 30; // le radar doit être devant soi, à ±30° du cap
 const SAME_DIRECTION_DEG = 45; // tolérance entre le sens contrôlé et notre cap
+// OSM enregistre souvent un même radar plusieurs fois (un point par voie, à quelques mètres) :
+// les points à moins de 50 m de celui annoncé sont considérés comme le même radar.
+export const SAME_SITE_M = 50;
 
 const CARDINALS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 
@@ -57,7 +60,11 @@ export function createAlertTracker(cameras) {
         if (!monitorsHeading(cam, heading)) continue;
         if (!best || d < best.distanceM) best = { camera: cam, distanceM: d };
       }
-      if (best) announced.add(best.camera.id);
+      if (best) {
+        for (const cam of cameras) {
+          if (distanceMeters(cam, best.camera) <= SAME_SITE_M) announced.add(cam.id);
+        }
+      }
       return best;
     },
   };

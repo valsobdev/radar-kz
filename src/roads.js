@@ -57,3 +57,23 @@ export function currentRoad(index, pos, heading) {
 export function isUrban(urbanAreas, pos) {
   return urbanAreas.some((area) => area.rings.some((ring) => pointInRing(pos, ring)));
 }
+
+// Garde la dernière route trouvée pendant quelques secondes quand le GPS s'en écarte
+// (avenue entre de hauts immeubles), pour ne pas afficher une fausse limite par défaut.
+export const ROAD_HOLD_MS = 5000;
+
+export function createRoadTracker(index) {
+  let lastRoad = null;
+  let lastSeen = -Infinity;
+  return {
+    update(pos, heading, timestamp) {
+      const road = currentRoad(index, pos, heading);
+      if (road) {
+        lastRoad = road;
+        lastSeen = timestamp;
+        return road;
+      }
+      return timestamp - lastSeen < ROAD_HOLD_MS ? lastRoad : null;
+    },
+  };
+}

@@ -17,3 +17,13 @@ test('défaut ville', () => assert.deepEqual(effectiveLimit({ isUrban: true }), 
 test('défaut hors ville', () => assert.deepEqual(effectiveLimit({ isUrban: false }), { kmh: 110, source: 'default' }));
 test('autoroute sans info', () => assert.deepEqual(effectiveLimit({ highway: 'motorway', isUrban: false }), { kmh: 110, source: 'default' }));
 test('zone résidentielle', () => assert.deepEqual(effectiveLimit({ highway: 'living_street', isUrban: true }), { kmh: 20, source: 'default' }));
+
+import { createOverspeedTracker } from '../src/speedlimit.js';
+test('revue: pas de bip à chaque oscillation autour de la limite', () => {
+  const t = createOverspeedTracker();
+  assert.deepEqual(t.update(61, 60), { over: true, beep: true });
+  assert.deepEqual(t.update(59, 60), { over: false, beep: false });
+  assert.deepEqual(t.update(61, 60), { over: true, beep: false }); // pas redescendu sous 57
+  t.update(55, 60);
+  assert.equal(t.update(61, 60).beep, true);
+});

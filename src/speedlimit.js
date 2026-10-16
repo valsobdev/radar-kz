@@ -38,3 +38,20 @@ export function effectiveLimit({ editorLimit = null, osmLimit = null, highway = 
   if (highway === 'motorway') return { kmh: DEFAULT_LIMITS.motorway, source: 'default' };
   return { kmh: DEFAULT_LIMITS.rural, source: 'default' };
 }
+
+// Excès de vitesse : rouge dès qu'on dépasse la limite, mais un seul bip tant qu'on n'est pas
+// redescendu nettement en dessous (évite de biper à chaque oscillation 59 / 61).
+export const BEEP_REARM_MARGIN_KMH = 3;
+
+export function createOverspeedTracker() {
+  let armed = true;
+  return {
+    update(speedKmh, limitKmh) {
+      const over = speedKmh > limitKmh;
+      const beep = over && armed;
+      if (beep) armed = false;
+      if (speedKmh <= limitKmh - BEEP_REARM_MARGIN_KMH) armed = true;
+      return { over, beep };
+    },
+  };
+}

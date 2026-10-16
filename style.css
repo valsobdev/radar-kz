@@ -83,3 +83,11 @@ html, body {
 
 /* Mention OSM lisible au-dessus du panneau et de la vitesse */
 .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { bottom: 118px; }
+
+/* Petit bandeau quand le GPS ne répond plus (tunnel, parking) */
+#gps-lost {
+  position: absolute; left: 50%; bottom: 130px; transform: translateX(-50%);
+  background: #333; color: #fff; border-radius: 12px; padding: 8px 14px;
+  font-size: 16px; font-weight: 700; white-space: nowrap;
+}
+#gps-lost.hidden { display: none; }

@@ -21,3 +21,12 @@ test('ville', () => {
   assert.equal(isUrban(urban, p), true);
   assert.equal(isUrban(urban, { lat: 42.5, lon: 76.5 }), false);
 });
+
+import { createRoadTracker, ROAD_HOLD_MS } from '../src/roads.js';
+test('revue: route conservée quelques secondes quand le GPS s\'en écarte', () => {
+  const t = createRoadTracker(idx);
+  assert.equal(t.update(p, 0, 0).id, 'ns');
+  const far = { lat: 43.240, lon: 76.9455 }; // ~40 m : plus de route trouvée
+  assert.equal(t.update(far, 0, 2000).id, 'ns');
+  assert.equal(t.update(far, 0, 2000 + ROAD_HOLD_MS), null);
+});

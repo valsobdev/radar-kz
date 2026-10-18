@@ -61,6 +61,7 @@ const MAX_FROM_DISTANCE_M = 300;
 // Relations enforcement=maxspeed : le membre « from » est en amont du radar (« device »),
 // donc le sens contrôlé va de « from » vers le radar. Complète le sens et la limite
 // seulement quand les balises du nœud ne les donnent pas.
+// Les caps issus des relations sont déjà des sens de marche : ne pas les inverser avec OSM_DIRECTION_IS_TRAVEL.
 function addSpeedRelations(elements, cameras, byNode, seen) {
   const found = new Map(); // nœud du radar → { directions, maxspeeds }
   for (const el of elements) {

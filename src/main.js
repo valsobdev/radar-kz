@@ -192,11 +192,10 @@ function onFix(fix) {
   }
   // Mise à jour ou disparition du bandeau
   let approach = null;
-  if (activeCamera && !isActive(activeCamera, Date.now())) activeCamera = null; // contrôle expiré en route
   if (activeCamera) {
     const d = distanceMeters(pos, activeCamera);
     const behind = heading != null && angleDiff(bearingDeg(pos, activeCamera), heading) > 90;
-    if (d > REARM_DISTANCE_M || behind) {
+    if (d > REARM_DISTANCE_M || behind || !isActive(activeCamera, Date.now())) { // ou contrôle expiré en route
       activeCamera = null;
       if (!zoneBanner) ui.alert.classList.add('hidden');
     } else {

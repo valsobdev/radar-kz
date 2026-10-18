@@ -31,14 +31,15 @@ Retourne dans **SQL Editor**, nouvelle requête, remplace l'email par le tien, p
 
 ```sql
 insert into editors (user_id) select id from auth.users where email = 'ton@email.com'
-on conflict do nothing;
+on conflict do nothing
+returning user_id;
 ```
 
-Tu dois voir « Success » (1 ligne ajoutée). Si tu vois « 0 rows » ou « Success. No rows returned » sans qu'une ligne ait été ajoutée, l'email ne correspond pas à celui de l'utilisateur : corrige-le et relance.
+Une ligne affichée (ton `user_id`) = c'est bon. Aucune ligne = l'email ne correspond pas à celui de l'utilisateur, ou tu es déjà éditeur (vérifie avec `select * from public.editors;`).
 
 ## 6. Copier les clés dans le projet
 1. Menu **Project Settings** (roue dentée), puis **API Keys**.
-2. Copie **Project URL** (de la forme `https://xxxx.supabase.co`) dans `SUPABASE_URL` du fichier `src/config.js`.
+2. Le **Project URL** est sur la page **Data API** (ou dans la fenêtre **Connect** en haut du tableau de bord). Copie-le (de la forme `https://xxxx.supabase.co`) dans `SUPABASE_URL` du fichier `src/config.js`.
 3. Les tableaux de bord récents affichent des clés « Publishable / Secret » et un onglet **Legacy API keys**. Ouvre cet onglet et copie la clé **anon public** (longue clé qui commence par `eyJ`) dans `SUPABASE_ANON_KEY`.
 
 Ne copie **jamais** la clé `service_role` ni la clé « Secret » : elles sont secrètes. La clé `anon` est publique par conception et peut être dans le dépôt.

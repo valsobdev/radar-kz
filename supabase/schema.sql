@@ -42,6 +42,7 @@ $$;
 
 drop trigger if exists elements_set_updated_at on public.elements;
 drop trigger if exists elements_set_tracking on public.elements;
+drop function if exists public.set_updated_at();
 create trigger elements_set_tracking
   before insert or update on public.elements
   for each row execute function public.set_tracking_fields();
@@ -60,6 +61,7 @@ grant insert, update, delete on public.elements to authenticated;
 grant select on public.editors to authenticated;
 revoke insert, update, delete on public.elements from anon;
 revoke insert, update, delete on public.editors from anon, authenticated;
+revoke truncate, references, trigger on public.elements, public.editors from anon, authenticated;
 
 -- Sécurité par lignes (RLS)
 alter table editors enable row level security;

@@ -58,6 +58,27 @@ Barre verticale à droite de l'écran (temps ou distance restants).
 | La barre disparaît à la fin de la zone | oui / non | |
 | La barre disparaît si le GPS est perdu (tunnel) | oui / non | |
 
+## Mode éditeur
+
+Le passager marque les éléments pendant le trajet (jamais le conducteur en conduisant).
+
+| Point à vérifier | Résultat | Remarque |
+|---|---|---|
+| Connexion éditeur réussie (menu éditeur visible) | oui / non | |
+| « Marquer ici » : Radar fixe | oui / non | |
+| « Marquer ici » : Caméra | oui / non | |
+| « Marquer ici » : Poste de police | oui / non | |
+| « Marquer ici » : Contrôle mobile (heure de fin choisie) | oui / non | |
+| « Marquer ici » : Autre | oui / non | |
+| Zone : « Début de zone ici » puis « Fin de zone ici » (limite choisie) | oui / non | |
+| Mode « Carte » : placer un élément en touchant la carte | oui / non | |
+| Mode « Carte » : déplacer un élément de l'éditeur (glisser) | oui / non | |
+| Mode « Carte » : « Corriger » un radar OpenStreetMap | oui / non | |
+| Mode « Carte » : « Masquer » un radar OpenStreetMap | oui / non | |
+| Hors réseau (mode avion) : le marquage est accepté, le compteur « en attente » monte | oui / non | |
+| Réseau rétabli : le compteur « en attente » revient à 0 | oui / non | |
+| Au passage suivant, l'alerte sonne sur un radar marqué pendant l'essai | oui / non | |
+
 ## Ressenti général
 
 - Alerte assez tôt ? trop tôt ? ..................................................

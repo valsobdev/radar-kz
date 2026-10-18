@@ -23,31 +23,35 @@ Supabase héberge la base de données des éléments (radars, zones, etc.). Tout
 2. Saisis ton email et un mot de passe (différent de celui de la base).
 3. Coche **Auto Confirm User**, puis valide. Ton utilisateur apparaît dans la liste.
 
+## 4 bis. Fermer les inscriptions publiques
+Menu **Authentication**, puis **Sign In / Providers**, et désactive **Allow new users to sign up**. Le bouton « Add user » continue de fonctionner pour toi (propriétaire).
+
 ## 5. Te déclarer éditeur
 Retourne dans **SQL Editor**, nouvelle requête, remplace l'email par le tien, puis **Run** :
 
 ```sql
-insert into editors (user_id) select id from auth.users where email = 'ton@email.com';
+insert into editors (user_id) select id from auth.users where email = 'ton@email.com'
+on conflict do nothing;
 ```
 
-Tu dois voir « Success » (1 ligne ajoutée).
+Tu dois voir « Success » (1 ligne ajoutée). Si tu vois « 0 rows » ou « Success. No rows returned » sans qu'une ligne ait été ajoutée, l'email ne correspond pas à celui de l'utilisateur : corrige-le et relance.
 
 ## 6. Copier les clés dans le projet
-1. Menu **Project Settings** (roue dentée), puis **API**.
+1. Menu **Project Settings** (roue dentée), puis **API Keys**.
 2. Copie **Project URL** (de la forme `https://xxxx.supabase.co`) dans `SUPABASE_URL` du fichier `src/config.js`.
-3. Copie la clé **anon public** (longue suite de caractères) dans `SUPABASE_ANON_KEY`.
+3. Les tableaux de bord récents affichent des clés « Publishable / Secret » et un onglet **Legacy API keys**. Ouvre cet onglet et copie la clé **anon public** (longue clé qui commence par `eyJ`) dans `SUPABASE_ANON_KEY`.
 
-Ne copie **jamais** la clé `service_role` : elle est secrète. La clé `anon` est publique par conception et peut être dans le dépôt.
+Ne copie **jamais** la clé `service_role` ni la clé « Secret » : elles sont secrètes. La clé `anon` est publique par conception et peut être dans le dépôt.
 
 ## Vérification
-Remplace `URL` et `ANON` par tes valeurs.
+Lance ces commandes dans **Git Bash** (pas PowerShell, où `curl` est un autre outil qui déforme le JSON). Remplace `URL` et `ANON` par tes valeurs.
 
 Lecture publique : doit répondre `[]`.
 ```
 curl "URL/rest/v1/elements?select=id" -H "apikey: ANON"
 ```
 
-Écriture avec la seule clé anon : doit être refusée (401 ou 403).
+Écriture avec la seule clé anon : doit répondre HTTP 401 avec un corps contenant `"code":"42501"` (règle de sécurité par lignes). Un 400 ou un 404 signifie que le test n'a pas fonctionné.
 ```
-curl -X POST "URL/rest/v1/elements" -H "apikey: ANON" -H "Content-Type: application/json" -d '{"kind":"other"}'
+curl -X POST "URL/rest/v1/elements" -H "apikey: ANON" -H "Content-Type: application/json" -d '{"kind":"other"}' -i
 ```

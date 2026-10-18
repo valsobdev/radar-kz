@@ -24,27 +24,42 @@ create table if not exists elements (
   updated_at timestamptz not null default now()
 );
 
--- Met à jour updated_at à chaque modification
-create or replace function public.set_updated_at() returns trigger
-language plpgsql as $$
+-- Fixe les champs de suivi : created_by/created_at non modifiables par le client
+create or replace function public.set_tracking_fields() returns trigger
+language plpgsql set search_path = '' as $$
 begin
-  new.updated_at = now();
+  if tg_op = 'INSERT' then
+    new.created_by := auth.uid();
+    new.created_at := pg_catalog.now();
+  else
+    new.created_by := old.created_by;
+    new.created_at := old.created_at;
+  end if;
+  new.updated_at := pg_catalog.now();
   return new;
 end;
 $$;
 
-drop trigger if exists elements_set_updated_at on elements;
-create trigger elements_set_updated_at
-  before update on elements
-  for each row execute function public.set_updated_at();
+drop trigger if exists elements_set_updated_at on public.elements;
+drop trigger if exists elements_set_tracking on public.elements;
+create trigger elements_set_tracking
+  before insert or update on public.elements
+  for each row execute function public.set_tracking_fields();
 
 -- Vrai si l'utilisateur connecté est un éditeur
 create or replace function public.is_editor() returns boolean
-language sql stable security definer set search_path = public as $$
-  select exists (select 1 from editors where user_id = auth.uid());
+language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.editors where user_id = auth.uid());
 $$;
 
 grant execute on function public.is_editor() to anon, authenticated;
+
+-- Droits explicites sur les tables
+grant select on public.elements to anon, authenticated;
+grant insert, update, delete on public.elements to authenticated;
+grant select on public.editors to authenticated;
+revoke insert, update, delete on public.elements from anon;
+revoke insert, update, delete on public.editors from anon, authenticated;
 
 -- Sécurité par lignes (RLS)
 alter table editors enable row level security;

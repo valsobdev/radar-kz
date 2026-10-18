@@ -1,9 +1,9 @@
 // Télécharge depuis OpenStreetMap les radars, routes et villes d'Almaty et ses environs,
-// puis écrit data/cameras.json, data/roads.json et data/urban.json.
+// puis écrit data/cameras.json, data/roads.json et data/urban.json et data/zones.json.
 // Lancer avec : node tools/import-osm.mjs
 // Données © les contributeurs OpenStreetMap, licence ODbL.
 import { writeFile, mkdir } from 'node:fs/promises';
-import { toCameras, toRoads, toUrban } from './osm-transform.mjs';
+import { toCameras, toRoads, toUrban, toZones } from './osm-transform.mjs';
 
 const BBOX = '42.95,76.40,43.95,77.60'; // sud, ouest, nord, est
 const SERVERS = [
@@ -16,10 +16,13 @@ const QUERIES = {
   cameras: `${HEADER}
 node["highway"="speed_camera"](${BBOX})->.cams;
 way(bn.cams)["highway"]->.ways;
-relation["type"="enforcement"]["enforcement"="traffic_signals"](${BBOX})->.rels;
+relation["type"="enforcement"]["enforcement"~"^(traffic_signals|maxspeed)$"](${BBOX})->.rels;
 (.cams; .ways; .rels;); out geom;`,
   roads: `${HEADER}
 way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street)(_link)?$"](${BBOX});
+out geom;`,
+  zones: `${HEADER}
+relation["type"="enforcement"]["enforcement"="average_speed"](${BBOX});
 out geom;`,
   urban: `${HEADER}
 (relation["place"~"^(city|town|village)$"](${BBOX});
@@ -52,7 +55,7 @@ async function overpass(query) {
 }
 
 await mkdir(new URL('../data/', import.meta.url), { recursive: true });
-const converters = { cameras: toCameras, roads: toRoads, urban: toUrban };
+const converters = { cameras: toCameras, roads: toRoads, urban: toUrban, zones: toZones };
 for (const [name, query] of Object.entries(QUERIES)) {
   console.log(`Téléchargement : ${name}…`);
   const items = converters[name](await overpass(query));

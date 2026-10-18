@@ -8,6 +8,8 @@ import { startSimulation, SIM_ZONES } from './sim.js';
 import { ICONS } from './icons.js';
 import { barState, formatDistance as formatApproach } from './zonebar.js';
 import { createZoneTracker, LOST_MS } from './zones.js';
+import { mergeElements } from './elements.js';
+import { loadRows } from './store.js';
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -43,7 +45,10 @@ async function loadJson(name) {
   return res.json();
 }
 function loadData() {
-  dataPromise ??= Promise.all([loadJson('cameras'), loadJson('roads'), loadJson('urban')]).then(([cameras, roads, urban]) => {
+  dataPromise ??= Promise.all([loadJson('cameras'), loadJson('roads'), loadJson('urban'), loadJson('zones')]).then(async ([osmCameras, roads, urban, osmZones]) => {
+    // Radars et zones OSM + relevés de l'éditeur (jamais d'exception : au pire, OSM seul).
+    const merged = mergeElements(osmCameras, osmZones, await loadRows(), Date.now());
+    const cameras = merged.cameras;
     if (map) {
       for (const cam of cameras) {
         const el = document.createElement('div');
@@ -52,8 +57,8 @@ function loadData() {
         new maplibregl.Marker({ element: el }).setLngLat([cam.lon, cam.lat]).addTo(map);
       }
     }
-    // Zones de vitesse moyenne : la liste viendra de la base (partie B), pour l'instant seulement en simulation.
-    const zonesList = simulate ? SIM_ZONES : [];
+    // Zones de vitesse moyenne : OSM + éditeur ; la simulation ajoute ses zones d'essai.
+    const zonesList = simulate ? [...merged.zones, ...SIM_ZONES] : merged.zones;
     return { roads: createRoadTracker(buildRoadIndex(roads)), urban, alerts: createAlertTracker(cameras), zones: createZoneTracker(zonesList) };
   });
   dataPromise.catch(() => { dataPromise = null; });
@@ -106,6 +111,8 @@ function alertText(cam, distanceM, zoneLimit = null) {
   const distance = formatApproach(distanceM); // même arrondi que la barre
   const limit = zoneLimit ?? cam.maxspeed;
   if (cam.type === 'red_light') return { title: 'Feu rouge', sub: 'Caméra au feu', distance, voice: "Caméra au feu, ne franchissez pas la ligne d'arrêt" };
+  if (cam.type === 'police' || cam.type === 'mobile') return { title: 'Contrôle de police', sub: 'Ralentissez', distance, voice: `Contrôle de police dans ${d} mètres` };
+  if (cam.type === 'other') return { title: 'Attention', sub: cam.note ?? '', distance, voice: `Attention dans ${d} mètres` };
   return {
     title: 'Radar',
     sub: limit ? `Limite ${limit} km/h` : 'Contrôle de vitesse',

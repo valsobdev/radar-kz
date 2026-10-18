@@ -1,94 +1,153 @@
-/* Écran de conduite « B » : carte plein écran, limite en bas à gauche, vitesse en bas à droite. */
+/* Écran de conduite « verre dépoli » : carte plein écran, vitesse en bas à gauche, limite en bas à droite. */
 :root {
-  --red: #d00000;
-  --ink: #111111;
-  --paper: #ffffff;
-  --blue: #1a73e8;
+  --glass: #ffffffb8;
+  --ink: #11131a;
+  --red: #e5484d;
+  --violet: #6c5cff;
+  --dark: #11131ae6;
+  --muted: #5d6474;
+  --glass-border: 1px solid #ffffffcc;
+  --glass-shadow: 0 12px 32px #2a344a1f;
 }
 * { box-sizing: border-box; }
 html, body {
   margin: 0;
   height: 100%;
   overflow: hidden; /* pas de défilement de la page */
-  background: #d9e8cf;
+  background: #e9edf2;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
   color: var(--ink);
   -webkit-user-select: none;
   user-select: none;
 }
 #map { position: absolute; inset: 0; }
 
-/* Notre position : flèche bleue fixe au centre, la carte tourne autour */
+/* Notre position : flèche violette fixe au centre, la carte tourne autour */
 #me {
   position: absolute; left: 50%; top: 50%;
-  width: 0; height: 0;
+  width: 34px; height: 34px;
   transform: translate(-50%, -60%);
-  border-left: 14px solid transparent;
-  border-right: 14px solid transparent;
-  border-bottom: 30px solid var(--blue);
-  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 1px 3px #0006);
+  filter: drop-shadow(0 2px 4px #6c5cff66);
   pointer-events: none;
+}
+#me svg { display: block; }
+
+/* Encadrés en verre dépoli */
+#alert, #gps-lost, .cam-marker {
+  background: var(--glass);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: var(--glass-border);
+  box-shadow: var(--glass-shadow);
 }
 
 /* Bandeau d'alerte en haut */
 #alert {
   position: absolute; top: max(12px, env(safe-area-inset-top)); left: 12px; right: 12px;
-  background: var(--red); color: #fff;
-  border-radius: 14px; padding: 14px 16px;
-  font-size: 22px; font-weight: 800;
-  box-shadow: 0 3px 10px #0005;
+  display: flex; align-items: center; gap: 11px;
+  padding: 11px 13px; border-radius: 22px;
 }
 #alert.hidden { display: none; }
-
-/* Panneau de limite en bas à gauche */
-.sign {
-  position: absolute; left: 14px; bottom: max(18px, env(safe-area-inset-bottom));
-  width: 88px; height: 88px; border-radius: 50%;
-  background: var(--paper); border: 10px solid var(--red);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 34px; font-weight: 900;
-  box-shadow: 0 2px 8px #0005;
+.alert-icon {
+  width: 38px; height: 38px; flex: none; padding: 8px;
+  border-radius: 13px; color: #fff;
+  background: linear-gradient(135deg, #ff6b6b, var(--red));
 }
+.alert-text { min-width: 0; }
+.alert-title { display: block; font-size: 17px; font-weight: 700; letter-spacing: -0.2px; }
+.alert-sub { font-size: 13px; font-weight: 500; color: var(--muted); }
+.alert-dist { margin-left: auto; font-size: 22px; font-weight: 800; letter-spacing: -0.5px; white-space: nowrap; }
 
-/* Vitesse en bas à droite, rouge en cas d'excès */
+/* Vitesse en bas à gauche, bloc foncé ; rouge en cas d'excès */
 #speed {
-  position: absolute; right: 14px; bottom: max(18px, env(safe-area-inset-bottom));
-  min-width: 96px; padding: 6px 12px;
-  background: var(--paper); border-radius: 16px;
-  text-align: center; font-size: 44px; font-weight: 900; line-height: 1;
-  box-shadow: 0 2px 8px #0005;
+  position: absolute; left: 14px; bottom: max(16px, env(safe-area-inset-bottom));
+  width: 84px; height: 84px; border-radius: 26px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--dark); color: #fff;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 12px 30px #11131a40;
 }
-#speed small { display: block; font-size: 13px; font-weight: 600; margin-top: 2px; }
-#speed.over { background: var(--red); color: #fff; }
+#speed-value { font-size: 36px; font-weight: 800; letter-spacing: -1.5px; line-height: 1; }
+#speed small { font-size: 10px; font-weight: 600; letter-spacing: 1px; margin-top: 3px; color: #ffffff8c; text-transform: uppercase; }
+#speed.over { background: var(--red); }
+#speed.over small { color: #ffffffcc; }
+
+/* Panneau de limite en bas à droite */
+.sign {
+  position: absolute; right: 14px; bottom: max(16px, env(safe-area-inset-bottom));
+  width: 76px; height: 76px; border-radius: 50%;
+  background: #fff; color: var(--ink); border: 8px solid var(--red);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 800; letter-spacing: -1px;
+  box-shadow: 0 12px 30px #2a344a26, 0 0 0 4px #ffffff99;
+}
+
+/* Barre de zone : fine barre verticale au-dessus du panneau, étiquette au-dessus */
+#zonebar {
+  position: absolute; right: 47px; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 96px);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: 10px; overflow: visible;
+}
+#zonebar.hidden { display: none; }
+#zonebar-label {
+  order: -1; align-self: flex-end;
+  padding: 5px 9px; border-radius: 12px;
+  background: var(--dark); color: #fff;
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+}
+#zonebar-track {
+  position: relative; width: 10px; height: 104px; border-radius: 5px; overflow: hidden;
+  background: #ffffffb3; box-shadow: 0 4px 12px #2a344a26;
+}
+#zonebar-fill {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 0;
+  border-radius: 5px; background: linear-gradient(180deg, #ffb26b, var(--red));
+}
 
 /* Écran de démarrage */
 #start {
   position: absolute; inset: 0;
-  background: #111111ee; color: #fff;
+  background: #e9edf2cc;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  color: var(--ink);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 24px; text-align: center;
 }
 #start.hidden { display: none; }
-#start h1 { margin: 0 0 8px; font-size: 34px; }
+#start h1 { margin: 0 0 8px; font-size: 34px; font-weight: 800; letter-spacing: -1px; }
+#start p { margin: 6px 0; }
 #start-button {
   margin: 24px 0; padding: 18px 48px;
-  font-size: 26px; font-weight: 800;
-  background: var(--blue); color: #fff; border: 0; border-radius: 16px;
+  font-size: 24px; font-weight: 800;
+  background: var(--violet); color: #fff; border: 0; border-radius: 22px;
+  box-shadow: 0 12px 30px #6c5cff55;
 }
-.message { min-height: 1.4em; color: #ffb4b4; font-weight: 600; }
-.small { font-size: 13px; opacity: 0.8; max-width: 320px; }
+.message { min-height: 1.4em; color: var(--red); font-weight: 600; }
+.small { font-size: 13px; color: var(--muted); max-width: 320px; }
 .small a { color: inherit; }
 
-/* Icônes des radars sur la carte */
-.cam-marker { font-size: 24px; line-height: 1; filter: drop-shadow(0 1px 2px #0008); }
+/* Marqueurs des radars sur la carte : petite pastille de verre ronde */
+.cam-marker {
+  width: 28px; height: 28px; padding: 5px; border-radius: 50%;
+  color: var(--red);
+}
 
-/* Mention OSM lisible au-dessus du panneau et de la vitesse */
+/* Mention OSM lisible au-dessus de la vitesse et du panneau */
 .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { bottom: 118px; }
 
 /* Petit bandeau quand le GPS ne répond plus (tunnel, parking) */
 #gps-lost {
   position: absolute; left: 50%; bottom: 130px; transform: translateX(-50%);
-  background: #333; color: #fff; border-radius: 12px; padding: 8px 14px;
-  font-size: 16px; font-weight: 700; white-space: nowrap;
+  border-radius: 14px; padding: 8px 14px;
+  font-size: 15px; font-weight: 700; white-space: nowrap;
 }
 #gps-lost.hidden { display: none; }
+
+/* Sans flou (anciens navigateurs) : fonds presque opaques pour rester lisibles */
+@supports not (backdrop-filter: blur(1px)) {
+  #alert, #gps-lost, .cam-marker { background: #fffffff0; }
+  #start { background: #f2f4f7f5; }
+}
+@supports not (-webkit-backdrop-filter: blur(1px)) and (not (backdrop-filter: blur(1px))) {
+  #speed { background: #11131af5; }
+}

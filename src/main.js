@@ -5,11 +5,13 @@ import { createAlertTracker, REARM_DISTANCE_M } from './cameras.js';
 import { buildRoadIndex, createRoadTracker, isUrban } from './roads.js';
 import { createMotionTracker } from './motion.js';
 import { startSimulation } from './sim.js';
+import { ICONS } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
 const ui = {
   start: $('start'), startButton: $('start-button'), message: $('message'),
-  alert: $('alert'), gpsLost: $('gps-lost'), limit: $('limit'), speed: $('speed'), speedValue: $('speed-value'),
+  alert: $('alert'), alertIcon: document.querySelector('#alert .alert-icon'), alertTitle: document.querySelector('#alert .alert-title'),
+  alertSub: document.querySelector('#alert .alert-sub'), alertDist: document.querySelector('#alert .alert-dist'), gpsLost: $('gps-lost'), limit: $('limit'), speed: $('speed'), speedValue: $('speed-value'),
 };
 const simulate = new URLSearchParams(location.search).has('sim');
 
@@ -42,7 +44,7 @@ function loadData() {
       for (const cam of cameras) {
         const el = document.createElement('div');
         el.className = 'cam-marker';
-        el.textContent = cam.type === 'red_light' ? '🚦' : '📷';
+        el.innerHTML = ICONS[cam.type] ?? ICONS.speed;
         new maplibregl.Marker({ element: el }).setLngLat([cam.lon, cam.lat]).addTo(map);
       }
     }
@@ -88,10 +90,12 @@ let started = false;
 
 function alertText(cam, distanceM) {
   const d = Math.max(50, Math.round(distanceM / 50) * 50);
-  if (cam.type === 'red_light') return { banner: `🚦 Caméra de feu rouge dans ${d} m`, voice: 'Caméra au feu, ne franchissez pas la ligne d\'arrêt' };
-  const limit = cam.maxspeed ? ` · ${cam.maxspeed}` : '';
+  const distance = d >= 1000 ? `${(d / 1000).toFixed(1).replace('.', ',')} km` : `${d} m`;
+  if (cam.type === 'red_light') return { title: 'Feu rouge', sub: 'Caméra au feu', distance, voice: "Caméra au feu, ne franchissez pas la ligne d'arrêt" };
   return {
-    banner: `📷 Radar dans ${d} m${limit}`,
+    title: 'Radar',
+    sub: cam.maxspeed ? `Limite ${cam.maxspeed} km/h` : 'Contrôle de vitesse',
+    distance,
     voice: `Radar dans ${d} mètres${cam.maxspeed ? `, limite ${cam.maxspeed}` : ''}`,
   };
 }
@@ -127,7 +131,11 @@ function onFix(fix) {
       activeCamera = null;
       ui.alert.classList.add('hidden');
     } else {
-      ui.alert.textContent = alertText(activeCamera, d).banner;
+      const text = alertText(activeCamera, d);
+      ui.alertIcon.innerHTML = ICONS[activeCamera.type] ?? ICONS.speed;
+      ui.alertTitle.textContent = text.title;
+      ui.alertSub.textContent = text.sub;
+      ui.alertDist.textContent = text.distance;
       ui.alert.classList.remove('hidden');
     }
   }

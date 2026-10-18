@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <meta name="theme-color" content="#111111">
+  <meta name="theme-color" content="#e9edf2">
   <title>Radar KZ</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
@@ -12,11 +12,22 @@
 </head>
 <body>
   <div id="map"></div>
-  <div id="me" aria-hidden="true"></div>
+  <div id="me" aria-hidden="true"><svg width="34" height="34" viewBox="0 0 24 24"><path d="M12 2.5 L19.5 20.5 L12 16.3 L4.5 20.5 Z" fill="#6c5cff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg></div>
 
-  <div id="alert" class="hidden" role="alert"></div>
-  <div id="gps-lost" class="hidden" role="status">📡 Signal GPS perdu…</div>
+  <div id="alert" class="hidden" role="alert">
+    <div class="alert-icon"></div>
+    <div class="alert-text">
+      <b class="alert-title"></b>
+      <span class="alert-sub"></span>
+    </div>
+    <div class="alert-dist"></div>
+  </div>
+  <div id="gps-lost" class="hidden" role="status">Signal GPS perdu…</div>
 
+  <div id="zonebar" class="hidden" aria-hidden="true">
+    <div id="zonebar-label"></div>
+    <div id="zonebar-track"><i id="zonebar-fill"></i></div>
+  </div>
   <div id="limit" class="sign" aria-label="Limite de vitesse">–</div>
   <div id="speed" aria-label="Vitesse actuelle"><span id="speed-value">0</span><small>km/h</small></div>
 

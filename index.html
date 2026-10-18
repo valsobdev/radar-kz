@@ -43,7 +43,37 @@
     <p id="message" class="message"></p>
     <p class="small">Gardez l'écran allumé. Ne manipulez pas le téléphone en conduisant.</p>
     <p class="small">Radars, limites et carte : © contributeurs <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)</p>
+    <button id="editor-link" type="button">Éditeur</button>
   </div>
+
+  <!-- Mode éditeur : bouton visible seulement pour un éditeur connecté -->
+  <button id="editor-button" class="hidden" type="button" aria-label="Menu éditeur">
+    <span class="editor-icon"></span>
+    <span id="editor-badge" class="hidden"></span>
+  </button>
+  <div id="editor-panel" class="hidden" role="dialog" aria-label="Menu éditeur">
+    <div class="ed-head">
+      <div>
+        <b>Mode éditeur</b>
+        <span class="ed-safety">Passager, ou conducteur à l'arrêt</span>
+      </div>
+      <button id="editor-close" class="ed-close" type="button" aria-label="Fermer">×</button>
+    </div>
+    <p id="editor-pending" class="ed-info hidden"></p>
+    <p id="editor-sync-error" class="ed-warn hidden"></p>
+    <div id="editor-body"></div>
+  </div>
+
+  <form id="login" class="hidden" novalidate>
+    <div class="login-card">
+      <b>Connexion éditeur</b>
+      <input id="login-email" type="email" autocomplete="username" placeholder="Email" required>
+      <input id="login-password" type="password" autocomplete="current-password" placeholder="Mot de passe" required>
+      <p id="login-error" class="message"></p>
+      <button id="login-submit" class="ed-btn primary" type="submit">Se connecter</button>
+      <button id="login-cancel" class="ed-btn" type="button">Annuler</button>
+    </div>
+  </form>
 
   <script type="module" src="src/main.js"></script>
 </body>

@@ -9,7 +9,9 @@ import { ICONS } from './icons.js';
 import { barState, formatDistance as formatApproach } from './zonebar.js';
 import { createZoneTracker, LOST_MS } from './zones.js';
 import { mergeElements, isActive } from './elements.js';
-import { loadRows } from './store.js';
+import { loadRows, pendingRows } from './store.js';
+import { overlayPending } from './editor-logic.js';
+import { initEditor } from './editor.js';
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -38,33 +40,67 @@ try {
 }
 
 // 2. Données : téléchargées au premier « Démarrer ». En cas d'échec, un nouveau toucher réessaie.
-let dataPromise = null;
+// Les fichiers OSM ne sont lus qu'une fois ; les relevés de l'éditeur peuvent être relus (refreshElements).
+let osmPromise = null;
 async function loadJson(name) {
   const res = await fetch(`data/${name}.json`);
   if (!res.ok) throw new Error(`${name}: HTTP ${res.status}`);
   return res.json();
 }
-function loadData() {
-  dataPromise ??= Promise.all([loadJson('cameras'), loadJson('roads'), loadJson('urban'), loadJson('zones')]).then(async ([osmCameras, roads, urban, osmZones]) => {
-    // Radars et zones OSM + relevés de l'éditeur (jamais d'exception : au pire, OSM seul).
-    const merged = mergeElements(osmCameras, osmZones, await loadRows(), Date.now());
-    const now = Date.now();
-    const cameras = merged.cameras;
-    if (map) {
-      for (const cam of cameras) {
-        if (!isActive(cam, now)) continue; // plus de marqueur pour un contrôle déjà expiré
-        const el = document.createElement('div');
-        el.className = 'cam-marker';
-        el.innerHTML = ICONS[cam.type] ?? ICONS.speed;
-        new maplibregl.Marker({ element: el }).setLngLat([cam.lon, cam.lat]).addTo(map);
-      }
+function loadOsm() {
+  osmPromise ??= Promise.all([loadJson('cameras'), loadJson('roads'), loadJson('urban'), loadJson('zones')])
+    .then(([osmCameras, roads, urban, osmZones]) => ({ osmCameras, osmZones, urban, roads: createRoadTracker(buildRoadIndex(roads)) }));
+  osmPromise.catch(() => { osmPromise = null; });
+  return osmPromise;
+}
+
+// Radars et zones OSM + relevés de l'éditeur (base ou copie locale, plus ceux encore en file d'attente).
+// Ne lève jamais : au pire, OSM seul.
+async function mergedElements(osm) {
+  const rows = await loadRows();
+  return mergeElements(osm.osmCameras, osm.osmZones, overlayPending(rows, pendingRows()), Date.now());
+}
+
+let markers = [];
+// Remplace les marqueurs de la carte ; renvoie les suivis d'alertes et de zones.
+function applyElements(merged) {
+  const now = Date.now();
+  for (const m of markers) m.remove();
+  markers = [];
+  if (map) {
+    for (const cam of merged.cameras) {
+      if (!isActive(cam, now)) continue; // plus de marqueur pour un contrôle déjà expiré
+      const el = document.createElement('div');
+      el.className = 'cam-marker';
+      el.innerHTML = ICONS[cam.type] ?? ICONS.speed;
+      markers.push(new maplibregl.Marker({ element: el }).setLngLat([cam.lon, cam.lat]).addTo(map));
     }
-    // Zones de vitesse moyenne : OSM + éditeur ; la simulation ajoute ses zones d'essai.
-    const zonesList = simulate ? [...merged.zones, ...SIM_ZONES] : merged.zones;
-    return { roads: createRoadTracker(buildRoadIndex(roads)), urban, alerts: createAlertTracker(cameras), zones: createZoneTracker(zonesList) };
-  });
-  dataPromise.catch(() => { dataPromise = null; });
-  return dataPromise;
+  }
+  // Zones de vitesse moyenne : OSM + éditeur ; la simulation ajoute ses zones d'essai.
+  const zonesList = simulate ? [...merged.zones, ...SIM_ZONES] : merged.zones;
+  return { alerts: createAlertTracker(merged.cameras), zones: createZoneTracker(zonesList) };
+}
+
+async function loadData() {
+  const osm = await loadOsm();
+  return { roads: osm.roads, urban: osm.urban, ...applyElements(await mergedElements(osm)) };
+}
+
+// Après un relevé de l'éditeur : marqueurs, alertes et zones à jour sans recharger la page.
+let refreshSeq = 0;
+let nextZones = null; // nouveau suivi de zones, appliqué à la sortie de la zone en cours
+async function refreshElements() {
+  if (!data) return; // pas encore démarré : « Démarrer » lira tout
+  const seq = ++refreshSeq;
+  const osm = await loadOsm();
+  const merged = await mergedElements(osm);
+  if (seq !== refreshSeq || !data) return; // une mise à jour plus récente est en cours
+  const { alerts, zones } = applyElements(merged);
+  // Les radars déjà à portée ne sont pas annoncés une seconde fois.
+  if (lastFix?.heading != null) alerts.update(lastFix.pos, lastFix.heading, Date.now());
+  data.alerts = alerts;
+  if (inZone) nextZones = zones; // ne pas couper le suivi d'une zone en cours
+  else { data.zones = zones; nextZones = null; }
 }
 
 // 3. Voix et bip
@@ -102,6 +138,8 @@ let activeCamera = null; // radar affiché dans le bandeau
 let started = false;
 let zoneBannerTimer = null; // masque le bandeau d'entrée de zone après 6 s
 let zoneBanner = false; // le bandeau affiche l'annonce de zone
+let lastFix = null; // dernière position acceptée { pos, heading }, pour le menu éditeur
+let inZone = false; // suivi d'une zone en cours
 
 function formatDistance(d) {
   return d >= 1000 ? `${(d / 1000).toFixed(1).replace('.', ',')} km` : `${d} m`;
@@ -165,9 +203,13 @@ function onFix(fix) {
   lostTimer = setTimeout(() => renderBar(null), LOST_MS);
 
   map?.easeTo({ center: [pos.lon, pos.lat], bearing: heading ?? map.getBearing(), duration: 900 });
+  lastFix = { pos, heading, at: Date.now() };
+  editor.onFix(lastFix);
 
-  // Zone de vitesse moyenne ?
+  // Zone de vitesse moyenne ? (les zones mises à jour par l'éditeur s'appliquent hors zone)
+  if (nextZones && !inZone) { data.zones = nextZones; nextZones = null; }
   const progress = data.zones.update(pos, heading, speedKmh, fix.timestamp);
+  inZone = !!progress;
 
   // Limite applicable
   const road = data.roads.update(pos, heading, fix.timestamp);
@@ -239,6 +281,11 @@ function showCredits() {
   creditsTimer = setTimeout(() => credits.classList.add('collapsed'), CREDITS_VISIBLE_MS);
 }
 $('attribution-toggle').addEventListener('click', showCredits);
+
+// Menu éditeur (bouton visible seulement pour un éditeur connecté).
+// Position trop ancienne (GPS perdu depuis plus de LOST_MS) : considérée inconnue.
+const getFix = () => (lastFix && Date.now() - lastFix.at <= LOST_MS ? lastFix : null);
+const editor = initEditor({ map, getFix, onChange: refreshElements });
 
 // 6. Bouton « Démarrer » : il faut un geste de l'utilisateur pour la voix, le son et l'écran allumé.
 ui.startButton.addEventListener('click', async () => {

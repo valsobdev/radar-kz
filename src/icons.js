@@ -15,4 +15,6 @@ export const ICONS = {
   other: svg('<path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5M12 17.4h.01"/>'),
   // Zone de contrôle : deux traits parallèles
   zone: svg('<path d="M7 3.5v17M17 3.5v17"/><path d="M12 6v3M12 11v3M12 16v3"/>'),
+  // Mode éditeur : crayon
+  edit: svg('<path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 013 3L8 18.5z"/><path d="M13.5 7l3 3"/>'),
 };

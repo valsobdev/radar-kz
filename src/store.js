@@ -92,6 +92,11 @@ async function flush() {
   return flushing;
 }
 
+// Envoi immédiat de la file (ex. après connexion). Ne lève jamais.
+export function flushNow() {
+  return flush().catch(() => 0);
+}
+
 // Message court pour l'interface si le dernier envoi a échoué, sinon null.
 export function lastSyncError() {
   const e = queue.lastError();
@@ -131,7 +136,10 @@ export async function signIn(email, password) {
     const sb = getClient();
     if (!sb) return { ok: false, error: 'Pas de réseau' };
     const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (!error) return { ok: true };
+    if (!error) {
+      flushNow(); // relevés faits avant la connexion (ou refusés pour session expirée) : envoi maintenant
+      return { ok: true };
+    }
     const offline = /fetch|network|failed/i.test(error.message ?? '') || error.status === 0;
     return { ok: false, error: offline ? 'Pas de réseau' : 'Email ou mot de passe incorrect' };
   } catch {

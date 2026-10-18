@@ -4,9 +4,10 @@ import { effectiveLimit, createOverspeedTracker } from './speedlimit.js';
 import { createAlertTracker, REARM_DISTANCE_M, ALERT_DISTANCE_M } from './cameras.js';
 import { buildRoadIndex, createRoadTracker, isUrban } from './roads.js';
 import { createMotionTracker } from './motion.js';
-import { startSimulation } from './sim.js';
+import { startSimulation, SIM_ZONES } from './sim.js';
 import { ICONS } from './icons.js';
 import { barState } from './zonebar.js';
+import { createZoneTracker } from './zones.js';
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -51,7 +52,9 @@ function loadData() {
         new maplibregl.Marker({ element: el }).setLngLat([cam.lon, cam.lat]).addTo(map);
       }
     }
-    return { roads: createRoadTracker(buildRoadIndex(roads)), urban, alerts: createAlertTracker(cameras) };
+    // Zones de vitesse moyenne : la liste viendra de la base (partie B), pour l'instant seulement en simulation.
+    const zonesList = simulate ? SIM_ZONES : [];
+    return { roads: createRoadTracker(buildRoadIndex(roads)), urban, alerts: createAlertTracker(cameras), zones: createZoneTracker(zonesList) };
   });
   dataPromise.catch(() => { dataPromise = null; });
   return dataPromise;
@@ -90,10 +93,16 @@ const overspeed = createOverspeedTracker();
 let data = null;
 let activeCamera = null; // radar affiché dans le bandeau
 let started = false;
+let zoneBannerTimer = null; // masque le bandeau d'entrée de zone après 6 s
+let zoneBanner = false; // le bandeau affiche l'annonce de zone
+
+function formatDistance(d) {
+  return d >= 1000 ? `${(d / 1000).toFixed(1).replace('.', ',')} km` : `${d} m`;
+}
 
 function alertText(cam, distanceM) {
   const d = Math.max(50, Math.round(distanceM / 50) * 50);
-  const distance = d >= 1000 ? `${(d / 1000).toFixed(1).replace('.', ',')} km` : `${d} m`;
+  const distance = formatDistance(d);
   if (cam.type === 'red_light') return { title: 'Feu rouge', sub: 'Caméra au feu', distance, voice: "Caméra au feu, ne franchissez pas la ligne d'arrêt" };
   return {
     title: 'Radar',
@@ -111,37 +120,64 @@ function renderBar(state) {
   ui.zonebarLabel.textContent = state.label;
 }
 
+// Annonce d'entrée dans une zone : bandeau 6 s + voix.
+function announceZone(zone, totalM) {
+  const km = (totalM / 1000).toFixed(1).replace('.', ',');
+  if (!activeCamera) { // un radar en cours garde le bandeau : seule la voix annonce la zone
+    ui.alertIcon.innerHTML = ICONS.zone;
+    ui.alertTitle.textContent = 'Zone de vitesse moyenne';
+    ui.alertSub.textContent = `Limite ${zone.maxspeed} km/h`;
+    ui.alertDist.textContent = formatDistance(totalM >= 1000 ? Math.round(totalM / 100) * 100 : Math.round(totalM / 50) * 50);
+    ui.alert.classList.remove('hidden');
+    zoneBanner = true;
+    clearTimeout(zoneBannerTimer);
+    zoneBannerTimer = setTimeout(() => {
+      if (!zoneBanner) return; // un radar a pris le bandeau entre-temps
+      zoneBanner = false;
+      ui.alert.classList.add('hidden');
+    }, 6000);
+  }
+  speak(`Zone de vitesse moyenne, ${zone.maxspeed}, sur ${km} km`);
+}
+
 function onFix(fix) {
   ui.gpsLost.classList.add('hidden');
   const { pos, speedKmh, heading } = motion.update(fix);
 
   map?.easeTo({ center: [pos.lon, pos.lat], bearing: heading ?? map.getBearing(), duration: 900 });
 
+  // Zone de vitesse moyenne ?
+  const progress = data.zones.update(pos, heading, speedKmh, fix.timestamp);
+
   // Limite applicable
   const road = data.roads.update(pos, heading, fix.timestamp);
-  const limit = effectiveLimit({ osmLimit: road?.maxspeed ?? null, highway: road?.highway ?? null, isUrban: isUrban(data.urban, pos) });
+  const limit = effectiveLimit({ editorLimit: progress?.zone.maxspeed ?? null, osmLimit: road?.maxspeed ?? null, highway: road?.highway ?? null, isUrban: isUrban(data.urban, pos) });
   ui.limit.textContent = limit.kmh;
 
   // Vitesse, rouge en cas d'excès, un bip par dépassement
   ui.speedValue.textContent = speedKmh;
   const { over, beep: shouldBeep } = overspeed.update(speedKmh, limit.kmh);
-  ui.speed.classList.toggle('over', over);
+  ui.speed.classList.toggle('over', over || !!progress?.averageOver);
   if (shouldBeep) beep();
+
+  if (progress?.entered) announceZone(progress.zone, progress.totalM);
+  if (progress?.warnAverage) speak('Moyenne trop haute, ralentissez');
 
   // Nouvelle alerte radar ?
   const alert = data.alerts.update(pos, heading);
   if (alert) {
     activeCamera = alert.camera;
+    zoneBanner = false; // le radar reprend le bandeau
     speak(alertText(alert.camera, alert.distanceM).voice);
   }
   // Mise à jour ou disparition du bandeau
+  let approach = null;
   if (activeCamera) {
     const d = distanceMeters(pos, activeCamera);
     const behind = heading != null && angleDiff(bearingDeg(pos, activeCamera), heading) > 90;
     if (d > REARM_DISTANCE_M || behind) {
       activeCamera = null;
-      ui.alert.classList.add('hidden');
-      renderBar(null);
+      if (!zoneBanner) ui.alert.classList.add('hidden');
     } else {
       const text = alertText(activeCamera, d);
       ui.alertIcon.innerHTML = ICONS[activeCamera.type] ?? ICONS.speed;
@@ -149,12 +185,12 @@ function onFix(fix) {
       ui.alertSub.textContent = text.sub;
       ui.alertDist.textContent = text.distance;
       ui.alert.classList.remove('hidden');
-      // Pas de barre pour un feu rouge. Plus tard : `zone` aura la priorité sur l'approche.
-      const approach = activeCamera.type === 'speed' || activeCamera.type === 'mobile'
+      approach = activeCamera.type === 'speed' || activeCamera.type === 'mobile'
         ? { distanceM: d, startM: ALERT_DISTANCE_M } : null;
-      renderBar(barState({ zone: null, approach, speedKmh }));
     }
   }
+  // Barre : la zone passe avant l'approche radar (pas de barre pour un feu rouge).
+  renderBar(barState({ zone: progress, approach, speedKmh }));
 }
 
 function onGpsError(err) {

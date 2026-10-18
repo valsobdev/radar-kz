@@ -42,6 +42,21 @@ Seuls quelques radars d'Almaty ont un sens enregistré dans OpenStreetMap
 
 Radar avec sens testé : rue ..............................  Résultat : bon sens / mauvais sens
 
+## Barre et zones
+
+Barre verticale à droite de l'écran (temps ou distance restants).
+
+| Point à vérifier | Résultat | Remarque |
+|---|---|---|
+| La barre apparaît avec l'alerte radar | oui / non | |
+| Le temps affiché est cohérent avec la distance et la vitesse | oui / non | |
+| La barre disparaît après le radar | oui / non | |
+| Zone de vitesse moyenne : annonce vocale à l'entrée | oui / non | |
+| La limite affichée sur le panneau est celle de la zone | oui / non | |
+| La barre descend pendant la zone | oui / non | |
+| « Moyenne trop haute » annoncé quand la moyenne dépasse la limite | oui / non / pas testé | |
+| La barre disparaît à la fin de la zone | oui / non | |
+
 ## Ressenti général
 
 - Alerte assez tôt ? trop tôt ? ..................................................

@@ -14,6 +14,11 @@ const ROUTE = [
   [43.25502, 76.98279], [43.25555, 76.98302], [43.25604, 76.98315], [43.25694, 76.98322],
 ].map(([lat, lon]) => ({ lat, lon }));
 
+// Zone de vitesse moyenne de test : ~1,5 km de la route, loin du départ pour que le cap soit connu à l'entrée.
+export const SIM_ZONES = [
+  { id: 'sim-zone', path: ROUTE.slice(11, 29).map((p) => [p.lat, p.lon]), maxspeed: 60 },
+];
+
 const SPEED_MS = 60 / 3.6;
 
 // Appelle onFix une fois par seconde, comme le ferait le vrai GPS (sans vitesse ni cap, pour tester les calculs).

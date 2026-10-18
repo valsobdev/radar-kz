@@ -1,6 +1,7 @@
 // Lecture des relevés de l'éditeur dans Supabase, avec copie locale pour travailler sans réseau.
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import { createQueue } from './queue.js';
+import { uuidV4 } from './uuid.js';
 
 const CACHE_KEY = 'radar-kz:rows';
 const TIMEOUT_MS = 5000;
@@ -16,6 +17,17 @@ const storage = (() => {
     return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { m.set(k, String(v)); }, removeItem: (k) => { m.delete(k); } };
   }
 })();
+
+// Petite valeur JSON gardée sur le téléphone (ex. zone en cours) ; ne lève jamais.
+export function readLocal(key) {
+  try { return JSON.parse(storage.getItem(key)); } catch { return null; }
+}
+export function writeLocal(key, value) {
+  try { storage.setItem(key, JSON.stringify(value)); } catch { /* stockage plein ou refusé */ }
+}
+export function removeLocal(key) {
+  try { storage.removeItem(key); } catch { /* ignoré */ }
+}
 
 let client = null;
 // Client Supabase créé à la demande (la bibliothèque est chargée par index.html).
@@ -56,7 +68,7 @@ const queue = createQueue(storage);
 const listeners = new Set();
 const notify = () => listeners.forEach((cb) => { try { cb(queue.pending()); } catch { /* écouteur fautif */ } });
 
-export const newId = () => crypto.randomUUID();
+export const newId = () => uuidV4(crypto); // repli si randomUUID manque (anciens navigateurs)
 export const pendingCount = () => queue.pending();
 // Appelle cb(n) à chaque changement de la file ; renvoie la fonction de désinscription.
 export function onPendingChange(cb) {

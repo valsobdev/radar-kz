@@ -8,7 +8,7 @@ import { startSimulation, SIM_ZONES } from './sim.js';
 import { ICONS } from './icons.js';
 import { barState, formatDistance as formatApproach } from './zonebar.js';
 import { createZoneTracker, LOST_MS } from './zones.js';
-import { mergeElements, isActive } from './elements.js';
+import { mergeElements, isActive, otherAlertSub } from './elements.js';
 import { loadRows, pendingRows } from './store.js';
 import { overlayPending } from './editor-logic.js';
 import { initEditor } from './editor.js';
@@ -159,7 +159,7 @@ function alertText(cam, distanceM, zoneLimit = null) {
   const limit = zoneLimit ?? cam.maxspeed;
   if (cam.type === 'red_light') return { title: 'Feu rouge', sub: 'Caméra au feu', distance, voice: "Caméra au feu, ne franchissez pas la ligne d'arrêt" };
   if (cam.type === 'police' || cam.type === 'mobile') return { title: 'Contrôle de police', sub: 'Ralentissez', distance, voice: `Contrôle de police dans ${d} mètres` };
-  if (cam.type === 'other') return { title: 'Attention', sub: cam.note ?? '', distance, voice: `Attention dans ${d} mètres` };
+  if (cam.type === 'other') return { title: 'Attention', sub: otherAlertSub(cam), distance, voice: `Attention dans ${d} mètres` };
   return {
     title: 'Radar',
     sub: limit ? `Limite ${limit} km/h` : 'Contrôle de vitesse',
@@ -211,7 +211,7 @@ function onFix(fix) {
 
   // Mode carte de l'éditeur : la carte ne suit plus la voiture, pour pouvoir la déplacer librement.
   if (!editor.isMapMode()) map?.easeTo({ center: [pos.lon, pos.lat], bearing: heading ?? map.getBearing(), duration: 900 });
-  lastFix = { pos, heading, at: Date.now() };
+  lastFix = { pos, heading, speedKmh, at: Date.now() };
   editor.onFix(lastFix);
 
   // Zone de vitesse moyenne ? (les zones mises à jour par l'éditeur s'appliquent hors zone)
@@ -291,8 +291,8 @@ function showCredits() {
 $('attribution-toggle').addEventListener('click', showCredits);
 
 // Menu éditeur (bouton visible seulement pour un éditeur connecté).
-// Position trop ancienne (GPS perdu depuis plus de LOST_MS) : considérée inconnue.
-const getFix = () => (lastFix && Date.now() - lastFix.at <= LOST_MS ? lastFix : null);
+// Dernière position acceptée, avec son heure (at) : le menu juge lui-même si elle est assez récente.
+const getFix = () => lastFix;
 const editor = initEditor({ map, getFix, onChange: refreshElements, getRoadIndex: () => roadIndex });
 
 // 6. Bouton « Démarrer » : il faut un geste de l'utilisateur pour la voix, le son et l'écran allumé.

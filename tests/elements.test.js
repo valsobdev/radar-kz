@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeElements, directionsFromChoice, isActive, MOBILE_DEFAULT_MS } from '../src/elements.js';
+import { mergeElements, directionsFromChoice, isActive, otherAlertSub, MOBILE_DEFAULT_MS } from '../src/elements.js';
 
 const NOW = Date.parse('2026-10-18T12:00:00Z');
 const osm = [
@@ -92,4 +92,15 @@ test("expiresMs porté par la caméra, isActive au moment de l'alerte", () => {
   assert.equal(isActive(cam, NOW), true);
   assert.equal(isActive(cam, NOW + 1000), false);
   assert.equal(isActive({ id: 'x' }, NOW), true);
+});
+
+test('caméra « autre » : marquée comme caméra pour le bandeau', () => {
+  const rows = [row({ id: 'a', kind: 'camera', controls: 'other' }), row({ id: 'd', kind: 'other' })];
+  const [cam, other] = mergeElements([], [], rows, NOW).cameras;
+  assert.equal(cam.type, 'other');
+  assert.equal(cam.camera, true);
+  assert.equal(other.camera, undefined);
+  assert.equal(otherAlertSub(cam), 'Caméra');
+  assert.equal(otherAlertSub({ ...cam, note: 'Sous le pont' }), 'Sous le pont');
+  assert.equal(otherAlertSub(other), '');
 });

@@ -201,3 +201,74 @@ test('caps arrondis en degrés entiers (colonne integer[] de la base)', () => {
   assert.deepEqual(buildPointRow({ id: 'a', kind: 'speed_camera', fix: { ...fix, heading: 359.7 }, choice: 'mine' }).directions, [0]);
   assert.deepEqual(buildPointRow({ id: 'a', kind: 'speed_camera', fix, choice: 'opposite' }).directions, [66]);
 });
+
+// --- Correctifs de la revue ---
+import {
+  autoExitMap, AUTO_EXIT_KMH, serializeZone, restoreZone, ZONE_RESUME_MS,
+  usableFix, fixAgeText, MARK_MAX_AGE_MS, hiddenOsmList,
+} from '../src/editor-logic.js';
+
+test('mode carte : sortie automatique après 2 points de suite au-dessus de 15 km/h', () => {
+  assert.equal(AUTO_EXIT_KMH, 15);
+  let s = autoExitMap(0, 20);
+  assert.deepEqual(s, { count: 1, exit: false });
+  s = autoExitMap(s.count, 30);
+  assert.deepEqual(s, { count: 2, exit: true });
+});
+
+test('mode carte : un point lent, à 15 km/h ou sans vitesse remet le compte à zéro', () => {
+  assert.deepEqual(autoExitMap(1, 10), { count: 0, exit: false });
+  assert.deepEqual(autoExitMap(1, 15), { count: 0, exit: false });
+  assert.deepEqual(autoExitMap(1, null), { count: 0, exit: false });
+  assert.deepEqual(autoExitMap(1, NaN), { count: 0, exit: false });
+});
+
+test('zone en cours : sauvegarde puis reprise', () => {
+  const path = [[43.2, 76.9], [north(30), 76.9]];
+  const saved = serializeZone({ path, ended: true, startedAt: NOW });
+  assert.deepEqual(saved, { start: [43.2, 76.9], path, startedAt: NOW });
+  const back = restoreZone(JSON.parse(JSON.stringify(saved)), NOW + H);
+  assert.deepEqual(back, { path, ended: false, startedAt: NOW });
+});
+
+test('zone en cours : reprise refusée après 2 h ou si illisible', () => {
+  const saved = serializeZone({ path: [[43.2, 76.9]], startedAt: NOW });
+  assert.equal(ZONE_RESUME_MS, 2 * H);
+  assert.ok(restoreZone(saved, NOW + 2 * H));
+  assert.equal(restoreZone(saved, NOW + 2 * H + 1), null);
+  assert.equal(restoreZone(null, NOW), null);
+  assert.equal(restoreZone({ path: [], startedAt: NOW }, NOW), null);
+  assert.equal(restoreZone({ path: [['a', 1]], startedAt: NOW }, NOW), null);
+  assert.equal(restoreZone({ path: [[43.2, 76.9]] }, NOW), null);
+  assert.equal(restoreZone({ path: [[43.2, 76.9]], startedAt: NOW + 60000 }, NOW), null); // date future
+});
+
+test('position pour « Marquer ici » : jusqu\'à 30 s', () => {
+  const fix = { pos: { lat: 43.2, lon: 76.9 }, heading: 90, at: NOW };
+  assert.equal(MARK_MAX_AGE_MS, 30000);
+  assert.equal(usableFix(fix, NOW + 30000, MARK_MAX_AGE_MS), fix);
+  assert.equal(usableFix(fix, NOW + 30001, MARK_MAX_AGE_MS), null);
+  assert.equal(usableFix(fix, NOW + 6000, 5000), null);
+  assert.equal(usableFix(null, NOW, MARK_MAX_AGE_MS), null);
+  assert.equal(usableFix({ pos: fix.pos }, NOW, MARK_MAX_AGE_MS), null); // heure inconnue
+});
+
+test('âge de la position affiché au-delà de 5 s', () => {
+  const fix = { pos: { lat: 43.2, lon: 76.9 }, at: NOW };
+  assert.equal(fixAgeText(fix, NOW + 5000), null);
+  assert.equal(fixAgeText(fix, NOW + 12400), "Position d'il y a 12 s");
+});
+
+test('radars OSM masqués : liste pour les réafficher', () => {
+  const rows = [
+    { id: 'h1', overrides: 'osm-n1', hidden: true, lat: 43.238123, lon: 76.945678 },
+    { id: 'c1', overrides: 'osm-n2', hidden: false, lat: 43.1, lon: 76.8 },
+    { id: 'p1', overrides: null, hidden: false, lat: 43.1, lon: 76.8 },
+    { id: 'h2', overrides: 'osm-n3', hidden: true, lat: null, lon: 76.8 },
+  ];
+  assert.deepEqual(hiddenOsmList(rows), [
+    { id: 'h1', osmId: 'osm-n1', label: 'osm-n1 — 43.2381, 76.9457' },
+    { id: 'h2', osmId: 'osm-n3', label: 'osm-n3' },
+  ]);
+  assert.deepEqual(hiddenOsmList(null), []);
+});

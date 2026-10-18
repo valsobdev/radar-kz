@@ -1,6 +1,7 @@
 // Calculs du menu éditeur (module pur, sans accès au navigateur) : relevés, tracé de zone, heure de fin.
 import { distanceMeters } from './geo.js';
 import { directionsFromChoice, MOBILE_DEFAULT_MS } from './elements.js';
+import { LOST_MS } from './zones.js';
 
 export const PATH_STEP_M = 20; // un point du tracé tous les 20 m
 export const ZONE_MIN_M = 50; // zone plus courte : refusée
@@ -135,4 +136,52 @@ export function zoneFeatures(rows) {
     });
   }
   return { type: 'FeatureCollection', features };
+}
+
+// --- Sécurité en roulant et relevés à ne pas perdre ---
+
+// Mode carte : quitté tout seul si la voiture roule (2 points de suite au-dessus de 15 km/h).
+export const AUTO_EXIT_KMH = 15;
+const AUTO_EXIT_FIXES = 2;
+// count : points rapides consécutifs déjà vus. Renvoie le nouveau compte et s'il faut sortir.
+export function autoExitMap(count, speedKmh) {
+  const next = isNum(speedKmh) && speedKmh > AUTO_EXIT_KMH ? count + 1 : 0;
+  return { count: next, exit: next >= AUTO_EXIT_FIXES };
+}
+
+// Zone « Début → Fin » en cours : sauvegardée à chaque point, reprise après rechargement pendant 2 h.
+export const ZONE_RESUME_MS = 2 * HOUR_MS;
+const isPoint = (p) => Array.isArray(p) && isNum(p[0]) && isNum(p[1]);
+export function serializeZone(zone) {
+  return { start: zone.path[0], path: zone.path, startedAt: zone.startedAt };
+}
+// Zone sauvegardée → { path, ended: false, startedAt }, ou null si illisible ou trop ancienne.
+export function restoreZone(saved, nowMs) {
+  const path = saved?.path;
+  if (!Array.isArray(path) || !path.length || !path.every(isPoint)) return null;
+  const t = saved.startedAt;
+  if (!isNum(t) || t > nowMs || nowMs - t > ZONE_RESUME_MS) return null;
+  return { path: path.map(([lat, lon]) => [lat, lon]), ended: false, startedAt: t };
+}
+
+// « Marquer ici » accepte une position jusqu'à 30 s ; au-delà de LOST_MS (5 s), son âge est affiché.
+export const MARK_MAX_AGE_MS = 30000;
+const fixAge = (fix, nowMs) => (fix?.pos && isNum(fix.at) ? Math.max(0, nowMs - fix.at) : Infinity);
+export function usableFix(fix, nowMs, maxAgeMs) {
+  return fixAge(fix, nowMs) <= maxAgeMs ? fix : null;
+}
+export function fixAgeText(fix, nowMs) {
+  const age = fixAge(fix, nowMs);
+  return age > LOST_MS && Number.isFinite(age) ? `Position d'il y a ${Math.round(age / 1000)} s` : null;
+}
+
+// Radars OSM masqués par l'éditeur : [{ id (ligne de masquage), osmId, label }].
+export function hiddenOsmList(rows) {
+  const list = [];
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!r?.overrides || r.hidden !== true || !r.id) continue;
+    const where = isNum(r.lat) && isNum(r.lon) ? ` — ${r.lat.toFixed(4)}, ${r.lon.toFixed(4)}` : '';
+    list.push({ id: r.id, osmId: r.overrides, label: `${r.overrides}${where}` });
+  }
+  return list;
 }

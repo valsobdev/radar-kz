@@ -1,13 +1,17 @@
 // Menu éditeur : connexion, « Marquer ici », zones de vitesse moyenne, relevés en attente,
 // et mode « Carte » (placer, déplacer, modifier, supprimer, corriger ou masquer un radar OSM).
-import { signIn, signOut, isEditor, saveRow, deleteRow, newId, pendingCount, onPendingChange, lastSyncError, flushNow } from './store.js';
+import {
+  signIn, signOut, isEditor, saveRow, deleteRow, newId, pendingCount, onPendingChange, lastSyncError, flushNow,
+  readLocal, writeLocal, removeLocal,
+} from './store.js';
 import { ICONS } from './icons.js';
 import {
   appendPathPoint, finishPath, pathLengthM, zoneError, expiresAtFor, buildPointRow, buildZoneRow, NOTE_KINDS,
   isEditorRow, kindForCamera, choiceFromDirections, findOverride, buildOverrideRow, buildHiddenRow, cardinalFr, zoneFeatures,
+  autoExitMap, serializeZone, restoreZone, usableFix, fixAgeText, MARK_MAX_AGE_MS, hiddenOsmList,
 } from './editor-logic.js';
 import { roadBearingAt } from './roads.js';
-import { snapZonePath } from './zones.js';
+import { snapZonePath, LOST_MS } from './zones.js';
 
 const LIMITS = [20, 40, 50, 60, 70, 80, 90, 100, 110];
 const TYPES = [
@@ -26,6 +30,7 @@ const CAM_LABELS = { speed: 'Radar fixe', red_light: 'Caméra feu rouge', police
 const VIOLET = '#6c5cff';
 const ZONES_SRC = 'editor-zones'; // zones de l'éditeur tracées en mode carte
 const DRAFT_SRC = 'editor-draft'; // zone en cours de dessin ou choisie
+const ZONE_KEY = 'radar-kz:zone'; // zone « Début → Fin » en cours, gardée sur le téléphone
 const toward = (bearing) => {
   const c = cardinalFr(bearing);
   return /^[eo]/.test(c) ? `vers l'${c}` : `vers le ${c}`;
@@ -47,7 +52,10 @@ function btn(text, onClick, cls = '') {
   return b;
 }
 
-export function initEditor({ map, getFix, onChange, getRoadIndex = () => null }) {
+// getFix() : dernière position acceptée { pos, heading, speedKmh, at } ou null.
+export function initEditor({ map, getFix: lastFix, onChange, getRoadIndex = () => null }) {
+  // Position récente (moins de LOST_MS), sinon null.
+  const getFix = () => usableFix(lastFix(), Date.now(), LOST_MS);
   const ui = {
     link: $('editor-link'), button: $('editor-button'), badge: $('editor-badge'),
     panel: $('editor-panel'), close: $('editor-close'), body: $('editor-body'),
@@ -61,7 +69,9 @@ export function initEditor({ map, getFix, onChange, getRoadIndex = () => null })
   // Relevé en cours : { source: 'route' | 'map', fix, kind, controls, note, temporary, choice, maxspeed, end,
   //   id (modification), base (ligne modifiée), osmId (correction d'un radar OSM), path (zone) }
   let draft = null;
-  let zone = null; // zone en cours d'enregistrement : { path, ended }
+  // Zone en cours d'enregistrement : { path, ended, startedAt } ; reprise après un rechargement (moins de 2 h).
+  let zone = restoreZone(readLocal(ZONE_KEY), Date.now());
+  if (!zone) removeLocal(ZONE_KEY);
   let status = ''; // message de l'accueil du menu (ou de la barre du mode carte)
   let onHome = false;
 
@@ -73,6 +83,7 @@ export function initEditor({ map, getFix, onChange, getRoadIndex = () => null })
   let loaded = false; // données chargées (« Démarrer » touché)
   let draftMarker = null; // point touché pendant le choix du type
   let draggedAt = 0; // un glisser se termine par un « click » à ignorer
+  let fastFixes = 0; // points rapides de suite : le mode carte se ferme en roulant
 
   // --- Bouton, compteur et ligne d'erreur ---
   function setEditor(yes) {
@@ -93,6 +104,8 @@ export function initEditor({ map, getFix, onChange, getRoadIndex = () => null })
   }
   onPendingChange(refreshPending);
   refreshPending();
+  updateRecording();
+  if (zone) status = 'Zone en cours reprise';
   isEditor().then(setEditor);
 
   // --- Fenêtre du menu ---
@@ -138,7 +151,7 @@ export function initEditor({ map, getFix, onChange, getRoadIndex = () => null })
     if (zone) {
       nodes.push(el('p', 'ed-info ed-zone-info', zoneInfo()));
       nodes.push(btn('Fin de zone ici', endZone, 'big primary'));
-      nodes.push(btn('Annuler la zone', () => { zone = null; status = 'Zone annulée'; updateRecording(); home(); }, 'ghost'));
+      nodes.push(btn('Annuler la zone', () => { setZone(null); status = 'Zone annulée'; home(); }, 'ghost'));
     } else {
       nodes.push(btn('Marquer ici', markHere, 'big primary'));
       nodes.push(btn('Début de zone ici', () => {
@@ -148,6 +161,8 @@ export function initEditor({ map, getFix, onChange, getRoadIndex = () => null })
       }));
     }
     if (map && loaded) nodes.push(mapMode ? btn('Quitter le mode carte', exitMapMode) : btn('Carte', enterMapMode));
+    const hidden = hiddenOsmList(rows);
+    if (hidden.length) nodes.push(btn(`Radars masqués (${hidden.length})`, showHidden));
     if (status) nodes.push(el('p', 'ed-status', status));
     nodes.push(btn('Se déconnecter', logout, 'ghost small'));
     show(null, nodes);
@@ -156,10 +171,14 @@ export function initEditor({ map, getFix, onChange, getRoadIndex = () => null })
 
   // --- « Marquer ici » ---
   function markHere() {
-    const fix = getFix();
+    const now = Date.now();
+    const fix = usableFix(lastFix(), now, MARK_MAX_AGE_MS); // GPS perdu depuis peu : dernière position connue
     if (!fix) { status = 'Position GPS inconnue'; home(); return; }
     // Position et cap figés au moment du toucher.
-    draft = { source: 'route', fix: { pos: { lat: fix.pos.lat, lon: fix.pos.lon }, heading: fix.heading ?? null } };
+    draft = {
+      source: 'route', fix: { pos: { lat: fix.pos.lat, lon: fix.pos.lon }, heading: fix.heading ?? null },
+      ageText: fixAgeText(fix, now),
+    };
     status = '';
     chooseType();
   }
@@ -244,6 +263,7 @@ export function initEditor({ map, getFix, onChange, getRoadIndex = () => null })
   function summary() {
     const type = TYPES.find((t) => t.kind === draft.kind)?.label ?? '';
     const lines = [draft.kind === 'camera' ? `${type} (${label(CONTROLS, draft.controls ?? 'speed')})` : type];
+    if (draft.ageText) lines.push(draft.ageText); // position ancienne (GPS perdu)
     if (draft.osmId) lines.push('Correction du radar OpenStreetMap');
     else if (draft.id) lines.push('Modification');
     if (draft.kind === 'average_zone') {
@@ -297,7 +317,7 @@ export function initEditor({ map, getFix, onChange, getRoadIndex = () => null })
     let row;
     if (draft.kind === 'average_zone') {
       row = buildZoneRow({ id, path: draft.path, maxspeed: draft.maxspeed });
-      if (draft.source === 'route') { zone = null; updateRecording(); }
+      if (draft.source === 'route') setZone(null);
     } else if (draft.osmId) {
       row = buildOverrideRow({
         id, osmId: draft.osmId, kind: draft.kind, fix: draft.fix, choice: draft.choice,
@@ -328,11 +348,20 @@ export function initEditor({ map, getFix, onChange, getRoadIndex = () => null })
   function updateRecording() {
     ui.button.classList.toggle('recording', !!zone);
   }
+  // Zone sauvegardée sur le téléphone à chaque changement : un rechargement ne la perd pas.
+  function storeZone() {
+    if (zone) writeLocal(ZONE_KEY, serializeZone(zone));
+    else removeLocal(ZONE_KEY);
+  }
+  function setZone(z) {
+    zone = z;
+    storeZone();
+    updateRecording();
+  }
   function startZone(fix) {
-    zone = { path: appendPathPoint([], fix.pos), ended: false };
+    setZone({ path: appendPathPoint([], fix.pos), ended: false, startedAt: Date.now() });
     draft = null;
     status = 'Zone commencée : touchez « Fin de zone ici » à la fin';
-    updateRecording();
     home();
   }
   function endZone() {
@@ -387,23 +416,47 @@ export function initEditor({ map, getFix, onChange, getRoadIndex = () => null })
   });
   async function logout() {
     exitMapMode();
-    zone = null;
+    setZone(null);
     draft = null;
     status = '';
-    updateRecording();
     await signOut();
     setEditor(false);
   }
 
   // Appelé par main.js à chaque point GPS accepté : échantillonne le tracé de la zone en cours.
+  // En mode carte, quitte ce mode si la voiture roule (le suivi de la carte reprend).
   function onFix(fix) {
+    if (mapMode) {
+      const step = autoExitMap(fastFixes, fix?.speedKmh);
+      fastFixes = step.count;
+      if (step.exit) exitMapMode();
+    }
     if (!zone || zone.ended || !fix?.pos) return;
     const before = zone.path.length;
     zone.path = appendPathPoint(zone.path, fix.pos);
-    if (onHome && zone.path.length !== before) {
+    if (zone.path.length === before) return;
+    storeZone();
+    if (onHome) {
       const info = ui.body.querySelector('.ed-zone-info');
       if (info) info.textContent = zoneInfo();
     }
+  }
+
+  // --- Radars OSM masqués : liste et « Réafficher » ---
+  function showHidden() {
+    const list = hiddenOsmList(rows);
+    if (!list.length) { home(); return; }
+    const items = list.map(({ id, label: text }) => {
+      const item = el('div', 'ed-hidden-item');
+      item.append(el('p', 'ed-info', text), btn('Réafficher', () => {
+        remove(id); // supprime la ligne de masquage, puis onChange
+        rows = rows.filter((r) => r.id !== id); // sans attendre la mise à jour des données
+        status = 'Radar réaffiché';
+        home();
+      }, 'small'));
+      return item;
+    });
+    show('Radars masqués', [...items, btn('Retour', home, 'ghost')]);
   }
 
   // ===== Mode carte =====
@@ -510,6 +563,7 @@ export function initEditor({ map, getFix, onChange, getRoadIndex = () => null })
   function enterMapMode() {
     if (!map || mapMode) return;
     mapMode = true;
+    fastFixes = 0;
     status = '';
     clearTap();
     closePanel();

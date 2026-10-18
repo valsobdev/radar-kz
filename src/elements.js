@@ -43,7 +43,13 @@ function rowToCamera(row) {
   const end = Date.parse(row.expires_at);
   if (row.expires_at != null && Number.isFinite(end)) cam.expiresMs = end; // pour l'expiration en cours de route
   if (typeof row.note === 'string' && row.note) cam.note = row.note; // texte du bandeau « Attention »
+  if (row.kind === 'camera') cam.camera = true; // caméra « autre » : bandeau « Caméra »
   return cam;
+}
+
+// Sous-titre du bandeau « Attention » (type 'other') : la note, sinon « Caméra » pour une caméra.
+export function otherAlertSub(cam) {
+  return cam.note ?? (cam.camera ? 'Caméra' : '');
 }
 
 function rowToZone(row) {

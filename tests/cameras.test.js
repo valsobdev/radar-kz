@@ -48,3 +48,21 @@ test('bug voix: un radar à 150 m du précédent reste annoncé', () => {
   t.update(south, 0);
   assert.equal(t.update({ lat: 43.2450, lon: 76.945 }, 0).camera.id, 'c3');
 });
+
+test('reconstruction : un radar déjà annoncé ne l\'est pas une seconde fois', () => {
+  const old = createAlertTracker([cam]);
+  assert.ok(old.update(south, 0));
+  assert.deepEqual(old.announcedIds(), ['c1']);
+  const other = { ...cam, id: 'c9', lat: 43.2482 }; // nouveau radar au même endroit (pas encore annoncé)
+  const t = createAlertTracker([cam], { announced: old.announcedIds() });
+  assert.equal(t.update(south, 0), null);
+  const t2 = createAlertTracker([other], { announced: ['c1', 'disparu'] }); // ids absents : ignorés
+  assert.equal(t2.update(south, 0)?.camera.id, 'c9');
+});
+
+test('reconstruction : le radar reporté se réarme après éloignement', () => {
+  const t = createAlertTracker([cam], { announced: ['c1'] });
+  assert.equal(t.update(south, 0), null);
+  t.update({ lat: 43.238, lon: 76.945 }, 0); // > 600 m
+  assert.ok(t.update(south, 0));
+});

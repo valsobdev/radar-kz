@@ -63,7 +63,8 @@ async function mergedElements(osm) {
 
 let markers = [];
 // Remplace les marqueurs de la carte ; renvoie les suivis d'alertes et de zones.
-function applyElements(merged) {
+// announced : ids déjà annoncés par l'ancien suivi d'alertes.
+function applyElements(merged, announced = []) {
   const now = Date.now();
   for (const m of markers) m.remove();
   markers = [];
@@ -78,7 +79,7 @@ function applyElements(merged) {
   }
   // Zones de vitesse moyenne : OSM + éditeur ; la simulation ajoute ses zones d'essai.
   const zonesList = simulate ? [...merged.zones, ...SIM_ZONES] : merged.zones;
-  return { alerts: createAlertTracker(merged.cameras), zones: createZoneTracker(zonesList) };
+  return { alerts: createAlertTracker(merged.cameras, { announced }), zones: createZoneTracker(zonesList) };
 }
 
 async function loadData() {
@@ -95,10 +96,8 @@ async function refreshElements() {
   const osm = await loadOsm();
   const merged = await mergedElements(osm);
   if (seq !== refreshSeq || !data) return; // une mise à jour plus récente est en cours
-  const { alerts, zones } = applyElements(merged);
-  // Les radars déjà à portée ne sont pas annoncés une seconde fois.
-  if (lastFix?.heading != null) alerts.update(lastFix.pos, lastFix.heading, Date.now());
-  data.alerts = alerts;
+  const { alerts, zones } = applyElements(merged, data.alerts.announcedIds());
+  data.alerts = alerts; // les radars déjà annoncés ne le sont pas une seconde fois
   if (inZone) nextZones = zones; // ne pas couper le suivi d'une zone en cours
   else { data.zones = zones; nextZones = null; }
 }

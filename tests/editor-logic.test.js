@@ -92,10 +92,13 @@ test('relevé caméra feu rouge : les deux sens, sans limite', () => {
   assert.equal(row.maxspeed, null);
 });
 
-test('relevé : controls seulement pour une caméra, note seulement pour autre', () => {
-  const p = buildPointRow({ id: 'x', kind: 'police_post', fix, choice: 'opposite', controls: 'speed', note: 'n' });
+test('relevé : controls seulement pour une caméra, note pour police, contrôle mobile et autre', () => {
+  const p = buildPointRow({ id: 'x', kind: 'police_post', fix, choice: 'opposite', controls: 'speed', note: ' Poste KPP ' });
   assert.equal(p.controls, null);
-  assert.equal(p.note, null);
+  assert.equal(p.note, 'Poste KPP');
+  assert.equal(buildPointRow({ id: 'm', kind: 'mobile_control', fix, choice: 'mine', note: 'Trépied' }).note, 'Trépied');
+  assert.equal(buildPointRow({ id: 'r', kind: 'speed_camera', fix, choice: 'mine', note: 'n' }).note, null);
+  assert.equal(buildPointRow({ id: 'c', kind: 'camera', fix, choice: 'mine', note: 'n' }).note, null);
   assert.deepEqual(p.directions, [270]);
   const o = buildPointRow({ id: 'y', kind: 'other', fix, choice: 'mine', note: '  Travaux  ', expiresAt: '2026-10-18T14:00:00.000Z' });
   assert.equal(o.note, 'Travaux');

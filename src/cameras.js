@@ -44,9 +44,12 @@ export function monitorsHeading(camera, heading) {
 }
 
 // Suit les radars déjà annoncés pour ne prévenir qu'une fois par passage.
-export function createAlertTracker(cameras) {
-  const announced = new Set();
+// options.announced : ids déjà annoncés par un ancien suivi (reconstruction après un relevé de l'éditeur).
+export function createAlertTracker(cameras, { announced: previous = [] } = {}) {
+  const ids = new Set(cameras.map((c) => c.id));
+  const announced = new Set([...previous].filter((id) => ids.has(id))); // ids absents : ignorés
   return {
+    announcedIds() { return [...announced]; },
     update(pos, heading, nowMs = null) { // nowMs : ignore les éléments expirés
       for (const cam of cameras) {
         if (announced.has(cam.id) && distanceMeters(pos, cam) > REARM_DISTANCE_M) announced.delete(cam.id);

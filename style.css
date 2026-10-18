@@ -178,6 +178,7 @@ html, body {
   color: var(--violet); font: inherit;
 }
 #editor-button.hidden { display: none; }
+#start:not(.hidden) ~ #editor-button { display: none; } /* caché tant que « Démarrer » n'a pas été touché */
 #editor-button .editor-icon { display: block; width: 100%; height: 100%; }
 /* Zone en cours d'enregistrement : anneau rouge */
 #editor-button.recording { color: var(--red); box-shadow: var(--glass-shadow), 0 0 0 3px var(--red); }

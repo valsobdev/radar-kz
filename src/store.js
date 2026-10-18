@@ -136,10 +136,7 @@ export async function signIn(email, password) {
     const sb = getClient();
     if (!sb) return { ok: false, error: 'Pas de réseau' };
     const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (!error) {
-      flushNow(); // relevés faits avant la connexion (ou refusés pour session expirée) : envoi maintenant
-      return { ok: true };
-    }
+    if (!error) return { ok: true }; // l'envoi de la file est fait par le menu, une fois le compte vérifié éditeur
     const offline = /fetch|network|failed/i.test(error.message ?? '') || error.status === 0;
     return { ok: false, error: offline ? 'Pas de réseau' : 'Email ou mot de passe incorrect' };
   } catch {

@@ -5,6 +5,7 @@ import { directionsFromChoice, MOBILE_DEFAULT_MS } from './elements.js';
 export const PATH_STEP_M = 20; // un point du tracé tous les 20 m
 export const ZONE_MIN_M = 50; // zone plus courte : refusée
 const HOUR_MS = 3600 * 1000;
+export const NOTE_KINDS = ['police_post', 'mobile_control', 'other']; // types qui gardent une note
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
 const toPos = ([lat, lon]) => ({ lat, lon });
 
@@ -58,7 +59,7 @@ export function expiresAtFor(choice, nowMs) {
 
 // Relevé ponctuel placé depuis la route (fix = { pos, heading } capturé au toucher de « Marquer ici »).
 export function buildPointRow({ id, kind, fix, choice, maxspeed = null, controls = null, note = null, expiresAt = null }) {
-  const text = kind === 'other' && typeof note === 'string' ? note.trim() : '';
+  const text = NOTE_KINDS.includes(kind) && typeof note === 'string' ? note.trim() : '';
   return {
     id, kind, lat: fix.pos.lat, lon: fix.pos.lon,
     directions: directionsFromChoice(choice, fix.heading),

@@ -1,7 +1,7 @@
 // Menu éditeur sur la route : connexion, « Marquer ici », zones de vitesse moyenne, relevés en attente.
-import { signIn, signOut, isEditor, saveRow, newId, pendingCount, onPendingChange, lastSyncError } from './store.js';
+import { signIn, signOut, isEditor, saveRow, newId, pendingCount, onPendingChange, lastSyncError, flushNow } from './store.js';
 import { ICONS } from './icons.js';
-import { appendPathPoint, finishPath, pathLengthM, zoneError, expiresAtFor, buildPointRow, buildZoneRow } from './editor-logic.js';
+import { appendPathPoint, finishPath, pathLengthM, zoneError, expiresAtFor, buildPointRow, buildZoneRow, NOTE_KINDS } from './editor-logic.js';
 
 const LIMITS = [20, 40, 50, 60, 70, 80, 90, 100, 110];
 const TYPES = [
@@ -152,11 +152,7 @@ export function initEditor({ map, getFix, onChange }) {
     ]);
   }
   function chooseOther() {
-    const note = el('input', 'ed-input');
-    note.type = 'text';
-    note.placeholder = 'Note (facultative)';
-    note.maxLength = 120;
-    note.value = draft.note ?? '';
+    const note = noteInput();
     const pick = (temporary) => () => { draft.note = note.value; draft.temporary = temporary; chooseSens(); };
     show('Autre', [note, grid([btn('Temporaire (2 h)', pick(true)), btn('Permanent', pick(false))]), cancel()]);
   }
@@ -205,10 +201,21 @@ export function initEditor({ map, getFix, onChange }) {
     }
     return lines;
   }
+  function noteInput() {
+    const note = el('input', 'ed-input');
+    note.type = 'text';
+    note.placeholder = 'Note (facultative)';
+    note.maxLength = 120;
+    note.value = draft.note ?? '';
+    return note;
+  }
   function confirm() {
     const box = el('div', 'ed-summary');
     for (const line of summary()) box.append(el('p', null, line));
-    show('Enregistrer ?', [box, btn('Enregistrer', save, 'big primary'), cancel()]);
+    // Poste de police, contrôle mobile : note facultative ici (« Autre » l'a déjà saisie).
+    const note = NOTE_KINDS.includes(draft.kind) && draft.kind !== 'other' ? noteInput() : null;
+    const onSave = () => { if (note) draft.note = note.value; save(); };
+    show('Enregistrer ?', [box, ...(note ? [note] : []), btn('Enregistrer', onSave, 'big primary'), cancel()]);
   }
 
   function save() {
@@ -282,8 +289,13 @@ export function initEditor({ map, getFix, onChange }) {
       const res = await signIn(email, password);
       if (!res.ok) { ui.loginError.textContent = res.error; return; }
       const yes = await isEditor();
-      if (!yes) { ui.loginError.textContent = "Ce compte n'est pas éditeur"; return; }
+      if (!yes) {
+        ui.loginError.textContent = "Ce compte n'est pas éditeur";
+        await signOut(); // pas de session ouverte pour un compte sans droit d'écriture
+        return;
+      }
       setEditor(true);
+      flushNow(); // relevés faits hors connexion (ou refusés pour session expirée) : envoi maintenant
       hideLogin();
       refreshPending();
     } finally {

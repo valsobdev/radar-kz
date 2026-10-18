@@ -219,6 +219,18 @@ function onGpsError(err) {
   } else ui.message.textContent = 'Recherche du GPS… Vérifiez que la localisation est activée.';
 }
 
+// Mention des sources de la carte : visible quelques secondes, puis repliée en icône « i »
+// (un toucher la réaffiche). La licence OpenStreetMap oblige à la montrer.
+const CREDITS_VISIBLE_MS = 5000;
+const credits = $('attribution');
+let creditsTimer = null;
+function showCredits() {
+  credits.classList.remove('collapsed');
+  clearTimeout(creditsTimer);
+  creditsTimer = setTimeout(() => credits.classList.add('collapsed'), CREDITS_VISIBLE_MS);
+}
+$('attribution-toggle').addEventListener('click', showCredits);
+
 // 6. Bouton « Démarrer » : il faut un geste de l'utilisateur pour la voix, le son et l'écran allumé.
 ui.startButton.addEventListener('click', async () => {
   if (started) return;
@@ -238,6 +250,7 @@ ui.startButton.addEventListener('click', async () => {
   if (simulate) {
     started = true;
     ui.start.classList.add('hidden');
+    showCredits();
     startSimulation(onFix);
     return;
   }
@@ -246,6 +259,7 @@ ui.startButton.addEventListener('click', async () => {
     return;
   }
   started = true;
+  showCredits();
   ui.message.textContent = 'Recherche du GPS…';
   navigator.geolocation.watchPosition(
     (p) => {

@@ -4,6 +4,7 @@ const KEY = 'radar-kz:queue';
 export function createQueue(storage) {
   let entries = load(); // [{ id, op: 'upsert'|'delete', row? }] dans l'ordre d'insertion
   let inFlight = null;
+  let lastError = null;
 
   function load() {
     try {
@@ -23,11 +24,12 @@ export function createQueue(storage) {
 
   async function run(send) {
     let sent = 0;
+    lastError = null;
     while (entries.length) {
       const entry = entries[0];
       try {
         await send(entry.op === 'delete' ? { op: 'delete', id: entry.id } : { op: 'upsert', row: entry.row });
-      } catch { break; }
+      } catch (e) { lastError = e ?? new Error('échec'); break; }
       // Retrait seulement si l'entrée n'a pas été remplacée pendant l'envoi.
       const i = entries.indexOf(entry);
       if (i >= 0) entries.splice(i, 1);
@@ -41,6 +43,9 @@ export function createQueue(storage) {
     put(row) { set({ id: row.id, op: 'upsert', row }); },
     remove(id) { set({ id, op: 'delete' }); },
     pending() { return entries.length; },
+    // Copie des entrées en attente ; dernière erreur d'envoi (null après un flush complet).
+    snapshot() { return entries.map((e) => ({ ...e })); },
+    lastError() { return lastError; },
     // Envoie dans l'ordre ; s'arrête au premier échec. Un seul envoi à la fois.
     flush(send) {
       if (!inFlight) inFlight = run(send).finally(() => { inFlight = null; });

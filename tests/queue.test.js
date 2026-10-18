@@ -92,3 +92,35 @@ test('premier échec arrête l’envoi et garde la suite', async () => {
   assert.deepEqual(seen, ['a', 'b']);
   assert.equal(q.pending(), 2);
 });
+
+test('put du même id pendant un envoi → la version récente est aussi envoyée', async () => {
+  const q = createQueue(fakeStorage());
+  q.put({ id: 'a', v: 1 });
+  const log = [];
+  const send = async (op) => {
+    log.push(op.row.v);
+    if (op.row.v === 1) q.put({ id: 'a', v: 2 });
+    await Promise.resolve();
+  };
+  assert.equal(await q.flush(send), 2);
+  assert.deepEqual(log, [1, 2]);
+  assert.equal(q.pending(), 0);
+});
+
+test('lastError garde la raison du refus, null après un flush complet', async () => {
+  const q = createQueue(fakeStorage());
+  assert.equal(q.lastError(), null);
+  q.put({ id: 'a' });
+  const err = new Error('refusé');
+  await q.flush(async () => { throw err; });
+  assert.equal(q.lastError(), err);
+  await q.flush(async () => {});
+  assert.equal(q.lastError(), null);
+});
+
+test('snapshot liste les entrées en attente', () => {
+  const q = createQueue(fakeStorage());
+  q.put({ id: 'a' });
+  q.remove('b');
+  assert.deepEqual(q.snapshot().map((e) => [e.id, e.op]), [['a', 'upsert'], ['b', 'delete']]);
+});

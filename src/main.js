@@ -8,7 +8,7 @@ import { startSimulation, SIM_ZONES } from './sim.js';
 import { ICONS } from './icons.js';
 import { barState, formatDistance as formatApproach } from './zonebar.js';
 import { createZoneTracker, LOST_MS } from './zones.js';
-import { mergeElements } from './elements.js';
+import { mergeElements, isActive } from './elements.js';
 import { loadRows } from './store.js';
 
 const $ = (id) => document.getElementById(id);
@@ -48,9 +48,11 @@ function loadData() {
   dataPromise ??= Promise.all([loadJson('cameras'), loadJson('roads'), loadJson('urban'), loadJson('zones')]).then(async ([osmCameras, roads, urban, osmZones]) => {
     // Radars et zones OSM + relevés de l'éditeur (jamais d'exception : au pire, OSM seul).
     const merged = mergeElements(osmCameras, osmZones, await loadRows(), Date.now());
+    const now = Date.now();
     const cameras = merged.cameras;
     if (map) {
       for (const cam of cameras) {
+        if (!isActive(cam, now)) continue; // plus de marqueur pour un contrôle déjà expiré
         const el = document.createElement('div');
         el.className = 'cam-marker';
         el.innerHTML = ICONS[cam.type] ?? ICONS.speed;
@@ -182,7 +184,7 @@ function onFix(fix) {
   if (progress?.warnAverage) speak('Moyenne trop haute, ralentissez');
 
   // Nouvelle alerte radar ?
-  const alert = data.alerts.update(pos, heading);
+  const alert = data.alerts.update(pos, heading, Date.now());
   if (alert) {
     activeCamera = alert.camera;
     zoneBanner = false; // le radar reprend le bandeau
@@ -190,6 +192,7 @@ function onFix(fix) {
   }
   // Mise à jour ou disparition du bandeau
   let approach = null;
+  if (activeCamera && !isActive(activeCamera, Date.now())) activeCamera = null; // contrôle expiré en route
   if (activeCamera) {
     const d = distanceMeters(pos, activeCamera);
     const behind = heading != null && angleDiff(bearingDeg(pos, activeCamera), heading) > 90;

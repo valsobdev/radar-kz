@@ -23,8 +23,10 @@ export async function loadRows() {
   try {
     const sb = getClient();
     if (!sb) throw new Error('Supabase indisponible');
-    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('délai dépassé')), TIMEOUT_MS));
-    const { data, error } = await Promise.race([sb.from('elements').select('*'), timeout]);
+    let timer;
+    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('délai dépassé')), TIMEOUT_MS); });
+    // Tri par date : la correction la plus récente d'un même radar passe en dernier et l'emporte.
+    const { data, error } = await Promise.race([sb.from('elements').select('*').order('updated_at'), timeout]).finally(() => clearTimeout(timer));
     if (error || !Array.isArray(data)) throw error ?? new Error('réponse invalide');
     try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch { /* stockage plein ou refusé */ }
     return data;

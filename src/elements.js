@@ -15,6 +15,15 @@ export function directionsFromChoice(choice, heading) {
   return [];
 }
 
+// Un élément à durée limitée (contrôle mobile) n'est plus actif une fois son heure de fin passée.
+export function isActive(camera, nowMs) {
+  return camera.expiresMs == null || camera.expiresMs > nowMs;
+}
+
+const cleanDirections = (d) => (Array.isArray(d)
+  ? d.filter((x) => typeof x === 'number' && Number.isFinite(x)).map((x) => ((x % 360) + 360) % 360)
+  : null);
+
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
 
 function expired(row, nowMs) {
@@ -28,9 +37,11 @@ function rowToCamera(row) {
   if (!type || !isNum(row.lat) || !isNum(row.lon)) return null;
   const cam = {
     id: row.id, type, lat: row.lat, lon: row.lon,
-    directions: Array.isArray(row.directions) ? row.directions : [],
+    directions: cleanDirections(row.directions) ?? [],
     maxspeed: isNum(row.maxspeed) ? row.maxspeed : null,
   };
+  const end = Date.parse(row.expires_at);
+  if (row.expires_at != null && Number.isFinite(end)) cam.expiresMs = end; // pour l'expiration en cours de route
   if (typeof row.note === 'string' && row.note) cam.note = row.note; // texte du bandeau « Attention »
   return cam;
 }
@@ -75,7 +86,7 @@ export function mergeElements(osmCameras, osmZones, rows, nowMs) {
       ...cam,
       lat: isNum(fix.lat) ? fix.lat : cam.lat,
       lon: isNum(fix.lon) ? fix.lon : cam.lon,
-      directions: Array.isArray(fix.directions) && fix.directions.length ? fix.directions : cam.directions, // [] = non précisé
+      directions: cleanDirections(fix.directions) ?? cam.directions, // [] = les deux sens
       maxspeed: isNum(fix.maxspeed) ? fix.maxspeed : cam.maxspeed,
     } : cam);
   }

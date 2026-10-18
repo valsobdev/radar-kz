@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeElements, directionsFromChoice, MOBILE_DEFAULT_MS } from '../src/elements.js';
+import { mergeElements, directionsFromChoice, isActive, MOBILE_DEFAULT_MS } from '../src/elements.js';
 
 const NOW = Date.parse('2026-10-18T12:00:00Z');
 const osm = [
@@ -24,7 +24,7 @@ test('ligne masquée sans correction ignorée', () => {
 });
 
 test('correction OSM : position et limite remplacées, id gardé', () => {
-  const { cameras } = mergeElements(osm, [], [row({ overrides: 'osm-n1', lat: 43.241, lon: 76.941, maxspeed: 50 })], NOW);
+  const { cameras } = mergeElements(osm, [], [row({ overrides: 'osm-n1', lat: 43.241, lon: 76.941, maxspeed: 50, directions: [90] })], NOW);
   assert.equal(cameras.length, 2);
   assert.deepEqual(cameras.find((c) => c.id === 'osm-n1'), { id: 'osm-n1', type: 'speed', lat: 43.241, lon: 76.941, directions: [90], maxspeed: 50 });
 });
@@ -36,7 +36,7 @@ test('contrôle mobile expiré ignoré', () => {
 
 test('contrôle mobile actif', () => {
   const r = row({ id: 'm1', kind: 'mobile_control', directions: [45], expires_at: new Date(NOW + MOBILE_DEFAULT_MS).toISOString() });
-  assert.deepEqual(mergeElements([], [], [r], NOW).cameras, [{ id: 'm1', type: 'mobile', lat: 43.3, lon: 76.9, directions: [45], maxspeed: null }]);
+  assert.deepEqual(mergeElements([], [], [r], NOW).cameras, [{ id: 'm1', type: 'mobile', lat: 43.3, lon: 76.9, directions: [45], maxspeed: null, expiresMs: NOW + MOBILE_DEFAULT_MS }]);
 });
 
 test('conversion des types', () => {
@@ -73,4 +73,23 @@ test('directionsFromChoice', () => {
   assert.deepEqual(directionsFromChoice('opposite', 90), [270]);
   assert.deepEqual(directionsFromChoice('both', 90), []);
   assert.deepEqual(directionsFromChoice('mine', null), []);
+});
+
+test('correction avec directions [] = les deux sens', () => {
+  const { cameras } = mergeElements(osm, [], [row({ overrides: 'osm-n1', directions: [] })], NOW);
+  assert.deepEqual(cameras.find((c) => c.id === 'osm-n1').directions, []);
+});
+
+test('directions nettoyées et normalisées', () => {
+  const r = row({ id: 'd1', directions: [370, 'x', null, 90, -90] });
+  assert.deepEqual(mergeElements([], [], [r], NOW).cameras[0].directions, [10, 90, 270]);
+});
+
+test("expiresMs porté par la caméra, isActive au moment de l'alerte", () => {
+  const r = row({ id: 'm1', kind: 'mobile_control', expires_at: new Date(NOW + 1000).toISOString() });
+  const [cam] = mergeElements([], [], [r], NOW).cameras;
+  assert.equal(cam.expiresMs, NOW + 1000);
+  assert.equal(isActive(cam, NOW), true);
+  assert.equal(isActive(cam, NOW + 1000), false);
+  assert.equal(isActive({ id: 'x' }, NOW), true);
 });

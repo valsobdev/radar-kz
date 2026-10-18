@@ -1,4 +1,5 @@
 // Radars : dans quel sens ils contrôlent, et quand prévenir le conducteur.
+import { isActive } from './elements.js';
 import { distanceMeters, bearingDeg, angleDiff } from './geo.js';
 
 // Dans OSM, « direction=90 » veut-il dire « contrôle les voitures qui roulent vers l'est »
@@ -46,14 +47,14 @@ export function monitorsHeading(camera, heading) {
 export function createAlertTracker(cameras) {
   const announced = new Set();
   return {
-    update(pos, heading) {
+    update(pos, heading, nowMs = null) { // nowMs : ignore les éléments expirés
       for (const cam of cameras) {
         if (announced.has(cam.id) && distanceMeters(pos, cam) > REARM_DISTANCE_M) announced.delete(cam.id);
       }
       if (heading == null) return null;
       let best = null;
       for (const cam of cameras) {
-        if (announced.has(cam.id)) continue;
+        if (announced.has(cam.id) || (nowMs != null && !isActive(cam, nowMs))) continue;
         const d = distanceMeters(pos, cam);
         if (d > ALERT_DISTANCE_M) continue;
         if (angleDiff(bearingDeg(pos, cam), heading) > AHEAD_CONE_DEG) continue;

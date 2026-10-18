@@ -34,7 +34,7 @@ html, body {
 #me svg { display: block; }
 
 /* Encadrés en verre dépoli */
-#alert, #gps-lost, .cam-marker {
+#alert, #gps-lost, #attribution, .cam-marker {
   background: var(--glass);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   border: var(--glass-border);
@@ -133,7 +133,14 @@ html, body {
 }
 
 /* Mention OSM lisible au-dessus de la vitesse et du panneau */
-.maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { bottom: 118px; }
+/* Mention de la carte : courte, entre le bloc vitesse et le panneau de limite */
+#attribution {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: max(16px, env(safe-area-inset-bottom));
+  max-width: 170px; padding: 4px 8px; border-radius: 10px;
+  text-align: center; font-size: 10px; line-height: 1.3; color: var(--ink);
+}
+#attribution a { color: inherit; }
 
 /* Petit bandeau quand le GPS ne répond plus (tunnel, parking) */
 #gps-lost {
@@ -145,7 +152,7 @@ html, body {
 
 /* Sans flou (ni préfixé ni standard) : fonds presque opaques pour rester lisibles */
 @supports (not (-webkit-backdrop-filter: blur(1px))) and (not (backdrop-filter: blur(1px))) {
-  #alert, #gps-lost, .cam-marker { background: #fffffff0; }
+  #alert, #gps-lost, #attribution, .cam-marker { background: #fffffff0; }
   #start { background: #f2f4f7f5; }
   #speed { background: #11131af5; }
   #speed.over { background: var(--red); }

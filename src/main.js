@@ -28,6 +28,7 @@ try {
     zoom: 16,
     pitch: 0,
     dragRotate: false,
+    attributionControl: false, // mention courte maison (#attribution)
   });
 } catch {
   map = null;

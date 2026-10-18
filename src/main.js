@@ -1,17 +1,19 @@
 // Relie les modules au navigateur : carte, GPS, voix et affichage de l'écran de conduite.
 import { distanceMeters, bearingDeg, angleDiff } from './geo.js';
 import { effectiveLimit, createOverspeedTracker } from './speedlimit.js';
-import { createAlertTracker, REARM_DISTANCE_M } from './cameras.js';
+import { createAlertTracker, REARM_DISTANCE_M, ALERT_DISTANCE_M } from './cameras.js';
 import { buildRoadIndex, createRoadTracker, isUrban } from './roads.js';
 import { createMotionTracker } from './motion.js';
 import { startSimulation } from './sim.js';
 import { ICONS } from './icons.js';
+import { barState } from './zonebar.js';
 
 const $ = (id) => document.getElementById(id);
 const ui = {
   start: $('start'), startButton: $('start-button'), message: $('message'),
   alert: $('alert'), alertIcon: document.querySelector('#alert .alert-icon'), alertTitle: document.querySelector('#alert .alert-title'),
   alertSub: document.querySelector('#alert .alert-sub'), alertDist: document.querySelector('#alert .alert-dist'), gpsLost: $('gps-lost'), limit: $('limit'), speed: $('speed'), speedValue: $('speed-value'),
+  zonebar: $('zonebar'), zonebarFill: $('zonebar-fill'), zonebarLabel: $('zonebar-label'),
 };
 const simulate = new URLSearchParams(location.search).has('sim');
 
@@ -100,6 +102,14 @@ function alertText(cam, distanceM) {
   };
 }
 
+// Barre verticale : null la cache, sinon hauteur du remplissage et texte.
+function renderBar(state) {
+  ui.zonebar.classList.toggle('hidden', !state);
+  if (!state) return;
+  ui.zonebarFill.style.height = `${state.fraction * 100}%`;
+  ui.zonebarLabel.textContent = state.label;
+}
+
 function onFix(fix) {
   ui.gpsLost.classList.add('hidden');
   const { pos, speedKmh, heading } = motion.update(fix);
@@ -130,6 +140,7 @@ function onFix(fix) {
     if (d > REARM_DISTANCE_M || behind) {
       activeCamera = null;
       ui.alert.classList.add('hidden');
+      renderBar(null);
     } else {
       const text = alertText(activeCamera, d);
       ui.alertIcon.innerHTML = ICONS[activeCamera.type] ?? ICONS.speed;
@@ -137,6 +148,10 @@ function onFix(fix) {
       ui.alertSub.textContent = text.sub;
       ui.alertDist.textContent = text.distance;
       ui.alert.classList.remove('hidden');
+      // Pas de barre pour un feu rouge. Plus tard : `zone` aura la priorité sur l'approche.
+      const approach = activeCamera.type === 'speed' || activeCamera.type === 'mobile'
+        ? { distanceM: d, startM: ALERT_DISTANCE_M } : null;
+      renderBar(barState({ zone: null, approach, speedKmh }));
     }
   }
 }

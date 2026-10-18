@@ -137,3 +137,12 @@ test('snap: point hors route → ligne droite', () => {
   const s = { lat: 43.201, lon: 76.900 }, e = { lat: 43.209, lon: 76.920 };
   assert.deepEqual(snapZonePath(idx, s, e), [[43.201, 76.900], [43.209, 76.920]]);
 });
+
+test('revue: approche lente à 49 m du début, une seule entrée et jamais de trou', () => {
+  const t = createZoneTracker([zone]);
+  const results = [];
+  // 20 km/h = 5,5 m/s ; un point par seconde depuis 49 m avant le début
+  for (let i = 0; i < 12; i++) results.push(t.update(at(-49 + i * 5.5), 0, 20, i * 1000));
+  assert.equal(results.filter((r) => r?.entered).length, 1);
+  assert.ok(results.every((r) => r !== null), 'la zone ne doit jamais être quittée');
+});

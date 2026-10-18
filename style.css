@@ -34,7 +34,7 @@ html, body {
 #me svg { display: block; }
 
 /* Encadrés en verre dépoli */
-#alert, #gps-lost, #attribution, .cam-marker {
+#alert, #gps-lost, #attribution {
   background: var(--glass);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   border: var(--glass-border);
@@ -130,6 +130,11 @@ html, body {
 .cam-marker {
   width: 28px; height: 28px; padding: 5px; border-radius: 50%;
   color: var(--red);
+}
+
+/* Marqueurs : fond opaque, sans flou (160 marqueurs sur une carte qui bouge) */
+.cam-marker {
+  background: #fffffff0; border: var(--glass-border); box-shadow: var(--glass-shadow);
 }
 
 /* Mention OSM lisible au-dessus de la vitesse et du panneau */

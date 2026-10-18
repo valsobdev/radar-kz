@@ -6,8 +6,8 @@ import { buildRoadIndex, createRoadTracker, isUrban } from './roads.js';
 import { createMotionTracker } from './motion.js';
 import { startSimulation, SIM_ZONES } from './sim.js';
 import { ICONS } from './icons.js';
-import { barState } from './zonebar.js';
-import { createZoneTracker } from './zones.js';
+import { barState, formatDistance as formatApproach } from './zonebar.js';
+import { createZoneTracker, LOST_MS } from './zones.js';
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -100,15 +100,17 @@ function formatDistance(d) {
   return d >= 1000 ? `${(d / 1000).toFixed(1).replace('.', ',')} km` : `${d} m`;
 }
 
-function alertText(cam, distanceM) {
-  const d = Math.max(50, Math.round(distanceM / 50) * 50);
-  const distance = formatDistance(d);
+// zoneLimit : limite de la zone en cours (elle prime sur celle du radar, comme sur le panneau).
+function alertText(cam, distanceM, zoneLimit = null) {
+  const d = Math.max(50, Math.round(distanceM / 50) * 50); // arrondi pour la voix
+  const distance = formatApproach(distanceM); // même arrondi que la barre
+  const limit = zoneLimit ?? cam.maxspeed;
   if (cam.type === 'red_light') return { title: 'Feu rouge', sub: 'Caméra au feu', distance, voice: "Caméra au feu, ne franchissez pas la ligne d'arrêt" };
   return {
     title: 'Radar',
-    sub: cam.maxspeed ? `Limite ${cam.maxspeed} km/h` : 'Contrôle de vitesse',
+    sub: limit ? `Limite ${limit} km/h` : 'Contrôle de vitesse',
     distance,
-    voice: `Radar dans ${d} mètres${cam.maxspeed ? `, limite ${cam.maxspeed}` : ''}`,
+    voice: `Radar dans ${d} mètres${limit ? `, limite ${limit}` : ''}`,
   };
 }
 
@@ -140,9 +142,18 @@ function announceZone(zone, totalM) {
   speak(`Zone de vitesse moyenne, ${zone.maxspeed}, sur ${km} km`);
 }
 
+// Chien de garde : sans point GPS accepté pendant LOST_MS, la barre disparaît (jamais de valeur périmée).
+let lostTimer = null;
+
 function onFix(fix) {
   ui.gpsLost.classList.add('hidden');
-  const { pos, speedKmh, heading } = motion.update(fix);
+  const { pos, speedKmh, heading, fresh } = motion.update(fix);
+  if (!fresh) { // point ignoré (imprécis ou en double) : on n'affiche rien de périmé
+    renderBar(null);
+    return;
+  }
+  clearTimeout(lostTimer);
+  lostTimer = setTimeout(() => renderBar(null), LOST_MS);
 
   map?.easeTo({ center: [pos.lon, pos.lat], bearing: heading ?? map.getBearing(), duration: 900 });
 
@@ -168,7 +179,7 @@ function onFix(fix) {
   if (alert) {
     activeCamera = alert.camera;
     zoneBanner = false; // le radar reprend le bandeau
-    speak(alertText(alert.camera, alert.distanceM).voice);
+    speak(alertText(alert.camera, alert.distanceM, progress?.zone.maxspeed).voice);
   }
   // Mise à jour ou disparition du bandeau
   let approach = null;
@@ -179,7 +190,7 @@ function onFix(fix) {
       activeCamera = null;
       if (!zoneBanner) ui.alert.classList.add('hidden');
     } else {
-      const text = alertText(activeCamera, d);
+      const text = alertText(activeCamera, d, progress?.zone.maxspeed);
       ui.alertIcon.innerHTML = ICONS[activeCamera.type] ?? ICONS.speed;
       ui.alertTitle.textContent = text.title;
       ui.alertSub.textContent = text.sub;
@@ -204,6 +215,7 @@ function onGpsError(err) {
   if (started) {
     ui.gpsLost.classList.remove('hidden');
     renderBar(null); // position incertaine : la barre disparaît
+    clearTimeout(lostTimer);
   } else ui.message.textContent = 'Recherche du GPS… Vérifiez que la localisation est activée.';
 }
 

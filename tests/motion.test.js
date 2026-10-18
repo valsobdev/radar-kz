@@ -19,7 +19,7 @@ test("cap conservé à l'arrêt", () => {
 });
 test('point imprécis ignoré', () => {
   const m = createMotionTracker(); const a = m.update(fix(43.2400, 0, { speed: 10 }));
-  assert.deepEqual(m.update(fix(43.30, 1000, { accuracy: 200 })), a);
+  assert.deepEqual(m.update(fix(43.30, 1000, { accuracy: 200 })), { ...a, fresh: false });
 });
 test('premier point : cap null', () => assert.equal(createMotionTracker().update(fix(43.24, 0)).heading, null));
 
@@ -46,4 +46,15 @@ test('revue: un point en double (même heure) ne remet pas la vitesse à 0', () 
 test('revue: vitesse GPS invalide (-1 ou NaN) traitée comme absente', () => {
   const m = createMotionTracker(); m.update(fix(43.2400, 0, { speed: -1 }));
   assert.equal(m.update(fix(43.2401, 1000, { speed: NaN })).speedKmh, 40);
+});
+
+test('fresh: vrai pour un point accepté, faux pour un point imprécis ou en double', () => {
+  const m = createMotionTracker();
+  assert.equal(m.update(fix(43.2400, 1000)).fresh, true);
+  assert.equal(m.update(fix(43.2401, 2000, { accuracy: 200 })).fresh, false);
+  assert.equal(m.update(fix(43.2400, 1000)).fresh, false); // doublon
+  assert.equal(m.update(fix(43.2401, 3000)).fresh, true);
+});
+test('fresh: faux même si le premier point est imprécis', () => {
+  assert.equal(createMotionTracker().update(fix(43.24, 0, { accuracy: 200 })).fresh, false);
 });

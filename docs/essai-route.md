@@ -56,6 +56,7 @@ Barre verticale à droite de l'écran (temps ou distance restants).
 | La barre descend pendant la zone | oui / non | |
 | « Moyenne trop haute » annoncé quand la moyenne dépasse la limite | oui / non / pas testé | |
 | La barre disparaît à la fin de la zone | oui / non | |
+| La barre disparaît si le GPS est perdu (tunnel) | oui / non | |
 
 ## Ressenti général
 

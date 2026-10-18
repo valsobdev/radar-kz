@@ -13,15 +13,16 @@ const median3 = (values) => [...values].sort((a, b) => a - b)[1];
 export function createMotionTracker() {
   let last = null; // dernier point accepté
   let headingFrom = null; // point de départ pour calculer le prochain cap
-  let result = null; // dernier résultat renvoyé
+  let result = null; // dernier résultat accepté
   const recentSpeeds = []; // 3 dernières vitesses calculées (m/s), pour effacer les sauts GPS isolés
 
   return {
     // fix : { lat, lon, speed (m/s ou null), heading (degrés ou null), accuracy (m), timestamp (ms) }
     update(fix) {
       const pos = { lat: fix.lat, lon: fix.lon };
-      if (fix.accuracy > MAX_ACCURACY_M) return result ?? { pos, speedKmh: 0, heading: null };
-      if (last && fix.timestamp <= last.timestamp) return result; // point en double ou dans le désordre
+      // fresh = faux : point ignoré, les valeurs renvoyées sont anciennes et ne doivent pas être affichées.
+      if (fix.accuracy > MAX_ACCURACY_M) return { ...(result ?? { pos, speedKmh: 0, heading: null }), fresh: false };
+      if (last && fix.timestamp <= last.timestamp) return { ...result, fresh: false }; // point en double ou dans le désordre
 
       let speedMs;
       if (validNumber(fix.speed)) {
@@ -48,7 +49,7 @@ export function createMotionTracker() {
       if (!headingFrom) headingFrom = pos;
 
       last = { ...pos, timestamp: fix.timestamp };
-      result = { pos, speedKmh, heading };
+      result = { pos, speedKmh, heading, fresh: true };
       return result;
     },
   };

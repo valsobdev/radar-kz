@@ -1,4 +1,4 @@
-// Barre de progression : temps restant et distance, affichés sous la vitesse.
+// Barre de progression : temps restant et distance, affichés au-dessus du panneau de limite.
 
 // En dessous de cette vitesse, le temps restant n'a pas de sens : on n'affiche que la distance.
 export const MIN_SPEED_FOR_TIME_KMH = 10;
@@ -18,7 +18,7 @@ function formatTime(distanceM, speedKmh) {
 }
 
 // « 740 m » arrondi à 10 m par défaut, puis « 2,4 km ».
-function formatDistance(distanceM) {
+export function formatDistance(distanceM) {
   if (distanceM < 1000) return `${Math.floor(distanceM / 10) * 10} m`;
   return `${(distanceM / 1000).toFixed(1).replace('.', ',')} km`;
 }

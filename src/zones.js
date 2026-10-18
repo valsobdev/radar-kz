@@ -74,7 +74,8 @@ export function createZoneTracker(zones) {
       const { pz } = cur;
       const { dist, along } = projectOnZone(pz, pos);
       const remainingM = pz.totalM - along;
-      if (timestamp - cur.lastTime > LOST_MS || dist > OFF_PATH_M || remainingM <= END_M) {
+      // Avant le début du tracé (along 0), on tolère le rayon d'entrée : sinon une entrée à 49 m ressortirait aussitôt.
+      if (timestamp - cur.lastTime > LOST_MS || dist > (along === 0 ? ENTRY_RADIUS_M : OFF_PATH_M) || remainingM <= END_M) {
         cur = null; // fin : on ne pourra rentrer que par le début
         return null;
       }

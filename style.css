@@ -143,11 +143,10 @@ html, body {
 }
 #gps-lost.hidden { display: none; }
 
-/* Sans flou (anciens navigateurs) : fonds presque opaques pour rester lisibles */
-@supports not (backdrop-filter: blur(1px)) {
+/* Sans flou (ni préfixé ni standard) : fonds presque opaques pour rester lisibles */
+@supports (not (-webkit-backdrop-filter: blur(1px))) and (not (backdrop-filter: blur(1px))) {
   #alert, #gps-lost, .cam-marker { background: #fffffff0; }
   #start { background: #f2f4f7f5; }
-}
-@supports not (-webkit-backdrop-filter: blur(1px)) and (not (backdrop-filter: blur(1px))) {
   #speed { background: #11131af5; }
+  #speed.over { background: var(--red); }
 }

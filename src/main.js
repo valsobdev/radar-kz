@@ -164,8 +164,10 @@ function onGpsError(err) {
   }
   // Tunnel, parking… : on ne cache pas la carte, on affiche juste un petit bandeau.
   // Le GPS continue d'être surveillé et le bandeau disparaît au prochain point.
-  if (started) ui.gpsLost.classList.remove('hidden');
-  else ui.message.textContent = 'Recherche du GPS… Vérifiez que la localisation est activée.';
+  if (started) {
+    ui.gpsLost.classList.remove('hidden');
+    renderBar(null); // position incertaine : la barre disparaît
+  } else ui.message.textContent = 'Recherche du GPS… Vérifiez que la localisation est activée.';
 }
 
 // 6. Bouton « Démarrer » : il faut un geste de l'utilisateur pour la voix, le son et l'écran allumé.

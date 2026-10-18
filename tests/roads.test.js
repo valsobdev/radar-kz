@@ -30,3 +30,13 @@ test('revue: route conservée quelques secondes quand le GPS s\'en écarte', () 
   assert.equal(t.update(far, 0, 2000).id, 'ns');
   assert.equal(t.update(far, 0, 2000 + ROAD_HOLD_MS), null);
 });
+
+import { roadBearingAt } from '../src/roads.js';
+test('cap de la route sous le doigt : segment le plus proche', () => {
+  assert.ok(Math.abs(roadBearingAt(idx, p) - 0) < 0.01); // ns tracée du sud vers le nord
+  assert.ok(Math.abs(roadBearingAt(idx, { lat: 43.2402, lon: 76.9452 + 0.002 }) - 90) < 0.1); // près de ew seulement
+});
+test('cap de la route : aucune route à moins de 25 m -> null', () => {
+  assert.equal(roadBearingAt(idx, { lat: 43.239, lon: 76.948 }), null);
+  assert.equal(roadBearingAt(null, p), null);
+});

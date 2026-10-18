@@ -42,6 +42,7 @@ try {
 // 2. Données : téléchargées au premier « Démarrer ». En cas d'échec, un nouveau toucher réessaie.
 // Les fichiers OSM ne sont lus qu'une fois ; les relevés de l'éditeur peuvent être relus (refreshElements).
 let osmPromise = null;
+let roadIndex = null; // index des routes, aussi utilisé par l'édition sur la carte
 async function loadJson(name) {
   const res = await fetch(`data/${name}.json`);
   if (!res.ok) throw new Error(`${name}: HTTP ${res.status}`);
@@ -49,16 +50,19 @@ async function loadJson(name) {
 }
 function loadOsm() {
   osmPromise ??= Promise.all([loadJson('cameras'), loadJson('roads'), loadJson('urban'), loadJson('zones')])
-    .then(([osmCameras, roads, urban, osmZones]) => ({ osmCameras, osmZones, urban, roads: createRoadTracker(buildRoadIndex(roads)) }));
+    .then(([osmCameras, roads, urban, osmZones]) => {
+      roadIndex = buildRoadIndex(roads);
+      return { osmCameras, osmZones, urban, roads: createRoadTracker(roadIndex) };
+    });
   osmPromise.catch(() => { osmPromise = null; });
   return osmPromise;
 }
 
 // Radars et zones OSM + relevés de l'éditeur (base ou copie locale, plus ceux encore en file d'attente).
-// Ne lève jamais : au pire, OSM seul.
+// Ne lève jamais : au pire, OSM seul. rows : relevés utilisés (pour l'édition sur la carte).
 async function mergedElements(osm) {
-  const rows = await loadRows();
-  return mergeElements(osm.osmCameras, osm.osmZones, overlayPending(rows, pendingRows()), Date.now());
+  const rows = overlayPending(await loadRows(), pendingRows());
+  return { ...mergeElements(osm.osmCameras, osm.osmZones, rows, Date.now()), rows };
 }
 
 let markers = [];
@@ -68,15 +72,19 @@ function applyElements(merged, announced = []) {
   const now = Date.now();
   for (const m of markers) m.remove();
   markers = [];
+  const entries = []; // marqueur + élément, pour l'édition sur la carte
   if (map) {
     for (const cam of merged.cameras) {
       if (!isActive(cam, now)) continue; // plus de marqueur pour un contrôle déjà expiré
       const el = document.createElement('div');
       el.className = 'cam-marker';
       el.innerHTML = ICONS[cam.type] ?? ICONS.speed;
-      markers.push(new maplibregl.Marker({ element: el }).setLngLat([cam.lon, cam.lat]).addTo(map));
+      const marker = new maplibregl.Marker({ element: el }).setLngLat([cam.lon, cam.lat]).addTo(map);
+      markers.push(marker);
+      entries.push({ marker, cam });
     }
   }
+  editor.setElements(merged.rows ?? [], entries);
   // Zones de vitesse moyenne : OSM + éditeur ; la simulation ajoute ses zones d'essai.
   const zonesList = simulate ? [...merged.zones, ...SIM_ZONES] : merged.zones;
   return { alerts: createAlertTracker(merged.cameras, { announced }), zones: createZoneTracker(zonesList) };
@@ -201,7 +209,8 @@ function onFix(fix) {
   clearTimeout(lostTimer);
   lostTimer = setTimeout(() => renderBar(null), LOST_MS);
 
-  map?.easeTo({ center: [pos.lon, pos.lat], bearing: heading ?? map.getBearing(), duration: 900 });
+  // Mode carte de l'éditeur : la carte ne suit plus la voiture, pour pouvoir la déplacer librement.
+  if (!editor.isMapMode()) map?.easeTo({ center: [pos.lon, pos.lat], bearing: heading ?? map.getBearing(), duration: 900 });
   lastFix = { pos, heading, at: Date.now() };
   editor.onFix(lastFix);
 
@@ -284,7 +293,7 @@ $('attribution-toggle').addEventListener('click', showCredits);
 // Menu éditeur (bouton visible seulement pour un éditeur connecté).
 // Position trop ancienne (GPS perdu depuis plus de LOST_MS) : considérée inconnue.
 const getFix = () => (lastFix && Date.now() - lastFix.at <= LOST_MS ? lastFix : null);
-const editor = initEditor({ map, getFix, onChange: refreshElements });
+const editor = initEditor({ map, getFix, onChange: refreshElements, getRoadIndex: () => roadIndex });
 
 // 6. Bouton « Démarrer » : il faut un geste de l'utilisateur pour la voix, le son et l'écran allumé.
 ui.startButton.addEventListener('click', async () => {

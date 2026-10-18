@@ -53,6 +53,22 @@ export function currentRoad(index, pos, heading) {
   return best;
 }
 
+// Orientation du segment de route le plus proche (≤ 25 m) d'un point touché sur la carte, sinon null.
+export function roadBearingAt(index, pos) {
+  if (!index?.cells || !pos) return null;
+  const i0 = cellOf(pos.lat), j0 = cellOf(pos.lon);
+  let best = null, bestDist = Infinity;
+  for (let i = i0 - 1; i <= i0 + 1; i++) {
+    for (let j = j0 - 1; j <= j0 + 1; j++) {
+      for (const seg of index.cells.get(cellKey(i, j)) ?? []) {
+        const d = distanceToSegmentMeters(pos, seg.a, seg.b);
+        if (d <= MATCH_MAX_M && d < bestDist) { best = seg; bestDist = d; }
+      }
+    }
+  }
+  return best ? best.bearing : null;
+}
+
 // Est-on à l'intérieur d'une ville ou d'un village ?
 export function isUrban(urbanAreas, pos) {
   return urbanAreas.some((area) => area.rings.some((ring) => pointInRing(pos, ring)));

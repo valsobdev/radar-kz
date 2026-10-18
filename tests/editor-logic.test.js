@@ -117,3 +117,87 @@ test('relevé zone : début, tracé, limite, sens vide', () => {
     controls: null, note: null, expires_at: null, overrides: null, hidden: false,
   });
 });
+
+import {
+  kindForCamera, choiceFromDirections, findOverride, buildOverrideRow, buildHiddenRow,
+  cardinalFr, zoneFeatures, isEditorRow,
+} from '../src/editor-logic.js';
+
+test('type OSM -> type de relevé', () => {
+  assert.deepEqual(kindForCamera('speed'), { kind: 'speed_camera', controls: null });
+  assert.deepEqual(kindForCamera('red_light'), { kind: 'camera', controls: 'red_light' });
+  assert.deepEqual(kindForCamera('police'), { kind: 'police_post', controls: null });
+  assert.deepEqual(kindForCamera('mobile'), { kind: 'mobile_control', controls: null });
+  assert.deepEqual(kindForCamera('bizarre'), { kind: 'speed_camera', controls: null });
+});
+
+test('sens prérempli depuis les caps enregistrés', () => {
+  assert.equal(choiceFromDirections([], 90), 'both');
+  assert.equal(choiceFromDirections([10, 190], 90), 'both');
+  assert.equal(choiceFromDirections([80], 90), 'mine');
+  assert.equal(choiceFromDirections([265], 90), 'opposite');
+  assert.equal(choiceFromDirections([80], null), 'both');
+});
+
+test('correction existante pour un radar OSM : la plus récente', () => {
+  const rows = [{ id: 'a', overrides: 'osm-1' }, { id: 'b', overrides: null }, { id: 'c', overrides: 'osm-1' }];
+  assert.equal(findOverride(rows, 'osm-1').id, 'c');
+  assert.equal(findOverride(rows, 'osm-2'), null);
+  assert.equal(findOverride(null, 'osm-1'), null);
+});
+
+test('ligne de correction OSM', () => {
+  const row = buildOverrideRow({
+    id: 'x', osmId: 'osm-1', kind: 'speed_camera', fix: { pos: { lat: 43.2, lon: 76.9 }, heading: 90 },
+    choice: 'opposite', maxspeed: 60,
+  });
+  assert.deepEqual(row, {
+    id: 'x', kind: 'speed_camera', lat: 43.2, lon: 76.9, directions: [270], maxspeed: 60,
+    controls: null, note: null, expires_at: null, overrides: 'osm-1', hidden: false,
+  });
+});
+
+test('ligne de masquage OSM', () => {
+  const row = buildHiddenRow({ id: 'y', osmId: 'osm-1', kind: 'speed_camera', lat: 43.2, lon: 76.9 });
+  assert.equal(row.hidden, true);
+  assert.equal(row.overrides, 'osm-1');
+  assert.equal(row.id, 'y');
+  assert.deepEqual(row.directions, []);
+  assert.equal(row.lat, 43.2);
+});
+
+test('points cardinaux', () => {
+  assert.equal(cardinalFr(0), 'nord');
+  assert.equal(cardinalFr(44), 'nord-est');
+  assert.equal(cardinalFr(90), 'est');
+  assert.equal(cardinalFr(200), 'sud');
+  assert.equal(cardinalFr(350), 'nord');
+  assert.equal(cardinalFr(-90), 'ouest');
+});
+
+test('tracés des zones de l\'éditeur en GeoJSON (lon, lat)', () => {
+  const rows = [
+    { id: 'z1', kind: 'average_zone', path: [[43.2, 76.9], [43.21, 76.91]], maxspeed: 60 },
+    { id: 'z2', kind: 'average_zone', path: [[43.2, 76.9]], maxspeed: 60 }, // tracé invalide
+    { id: 'z3', kind: 'average_zone', path: [[43.2, 76.9], [43.21, 76.91]], hidden: true },
+    { id: 'p', kind: 'speed_camera', lat: 43.2, lon: 76.9 },
+  ];
+  const fc = zoneFeatures(rows);
+  assert.equal(fc.type, 'FeatureCollection');
+  assert.equal(fc.features.length, 1);
+  assert.deepEqual(fc.features[0].geometry, { type: 'LineString', coordinates: [[76.9, 43.2], [76.91, 43.21]] });
+  assert.equal(fc.features[0].properties.id, 'z1');
+  assert.deepEqual(zoneFeatures(null).features, []);
+});
+
+test('élément de l\'éditeur ou radar OSM', () => {
+  assert.equal(isEditorRow({ id: 'osm-n1' }), false);
+  assert.equal(isEditorRow({ id: '3f2a-uuid' }), true);
+});
+
+test('caps arrondis en degrés entiers (colonne integer[] de la base)', () => {
+  const fix = { pos: { lat: 43.2, lon: 76.9 }, heading: 245.6 };
+  assert.deepEqual(buildPointRow({ id: 'a', kind: 'speed_camera', fix, choice: 'mine' }).directions, [246]);
+  assert.deepEqual(buildPointRow({ id: 'a', kind: 'speed_camera', fix: { ...fix, heading: 359.7 }, choice: 'mine' }).directions, [0]);
+  assert.deepEqual(buildPointRow({ id: 'a', kind: 'speed_camera', fix, choice: 'opposite' }).directions, [66]);
+});

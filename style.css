@@ -237,6 +237,26 @@ html, body {
 .ed-summary { margin: 0 0 10px; padding: 10px 14px; border-radius: 16px; background: #ffffffb3; }
 .ed-summary p { margin: 4px 0; font-size: 16px; font-weight: 600; }
 
+.ed-btn.selected { box-shadow: 0 0 0 3px var(--violet); }
+.ed-btn.danger { background: var(--red); color: #fff; border-color: transparent; box-shadow: 0 10px 24px #e5484d44; }
+.ed-grid.one { grid-template-columns: 1fr; }
+
+/* Mode carte : barre de verre en haut, marqueurs plus grands et déplaçables */
+.ed-mapbar {
+  position: absolute; top: max(12px, env(safe-area-inset-top)); left: 8px; right: 8px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 8px 8px 14px; border-radius: 22px;
+}
+.ed-mapbar.hidden, .ed-mapbar .hidden { display: none; }
+.ed-mapbar-msg { flex: 1; min-width: 0; }
+.ed-mapbar-text { margin: 0; font-size: 15px; font-weight: 700; }
+.ed-mapbar-status { margin: 2px 0 0; font-size: 13px; font-weight: 600; color: var(--violet); }
+.ed-mapbar .ed-btn { width: auto; flex: none; margin: 0; padding: 0 14px; min-height: 48px; }
+.cam-marker.editable { width: 36px; height: 36px; padding: 7px; cursor: grab; }
+.cam-marker.editable::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; } /* zone de toucher ~50 px (le marqueur est déjà en position absolue) */
+.cam-marker.mine { border: 3px solid var(--violet); color: var(--violet); }
+body.map-edit #me { display: none; } /* la carte ne suit plus la voiture : flèche centrale trompeuse */
+
 /* Fenêtre de connexion de l'éditeur */
 #login {
   position: absolute; inset: 0; margin: 0;
@@ -257,7 +277,7 @@ html, body {
 .login-card .message { margin: 0 0 8px; }
 
 /* Verre dépoli pour le bouton, le menu et la fenêtre de connexion */
-#editor-button, #editor-panel, .login-card {
+#editor-button, #editor-panel, .login-card, .ed-mapbar {
   background: var(--glass);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   border: var(--glass-border);
@@ -267,7 +287,7 @@ html, body {
 /* Sans flou (ni préfixé ni standard) : fonds presque opaques pour rester lisibles */
 @supports (not (-webkit-backdrop-filter: blur(1px))) and (not (backdrop-filter: blur(1px))) {
   #alert, #gps-lost, #attribution, .cam-marker { background: #fffffff0; }
-  #editor-button, #editor-panel, .login-card { background: #fffffff5; }
+  #editor-button, #editor-panel, .login-card, .ed-mapbar { background: #fffffff5; }
   #start { background: #f2f4f7f5; }
   #speed { background: #11131af5; }
   #speed.over { background: var(--red); }

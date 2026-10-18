@@ -62,7 +62,7 @@ export function buildPointRow({ id, kind, fix, choice, maxspeed = null, controls
   const text = NOTE_KINDS.includes(kind) && typeof note === 'string' ? note.trim() : '';
   return {
     id, kind, lat: fix.pos.lat, lon: fix.pos.lon,
-    directions: directionsFromChoice(choice, fix.heading),
+    directions: directionsFromChoice(choice, fix.heading).map((d) => Math.round(d) % 360), // colonne integer[]
     maxspeed: isNum(maxspeed) ? maxspeed : null,
     controls: kind === 'camera' ? (controls ?? 'speed') : null,
     note: text || null,
@@ -77,4 +77,62 @@ export function buildZoneRow({ id, path, maxspeed }) {
     id, kind: 'average_zone', lat: path[0][0], lon: path[0][1], path, maxspeed, directions: [],
     controls: null, note: null, expires_at: null, overrides: null, hidden: false,
   };
+}
+
+// --- Édition sur la carte ---
+
+// Radar OSM (préfixe « osm- ») ou relevé de l'éditeur.
+export const isEditorRow = (item) => typeof item?.id === 'string' && !item.id.startsWith('osm-');
+
+// Type de marqueur (cameras.json) → type de relevé, pour corriger ou masquer un radar OSM.
+export function kindForCamera(type) {
+  if (type === 'red_light') return { kind: 'camera', controls: 'red_light' };
+  const kind = { police: 'police_post', mobile: 'mobile_control', other: 'other' }[type] ?? 'speed_camera';
+  return { kind, controls: null };
+}
+
+// Caps enregistrés → choix prérempli ('mine' / 'opposite' / 'both') par rapport au cap de la route.
+export function choiceFromDirections(directions, heading) {
+  if (!Array.isArray(directions) || directions.length !== 1 || !isNum(heading)) return 'both';
+  const d = Math.abs((((directions[0] - heading) % 360) + 360) % 360);
+  return (d > 180 ? 360 - d : d) <= 90 ? 'mine' : 'opposite';
+}
+
+// Dernière ligne de correction ou de masquage d'un radar OSM, sinon null.
+export function findOverride(rows, osmId) {
+  const list = Array.isArray(rows) ? rows.filter((r) => r?.overrides === osmId) : [];
+  return list[list.length - 1] ?? null;
+}
+
+// Correction d'un radar OSM : mêmes champs qu'un relevé, avec overrides = id OSM.
+export function buildOverrideRow({ id, osmId, kind, fix, choice, maxspeed = null, controls = null }) {
+  return { ...buildPointRow({ id, kind, fix, choice, maxspeed, controls }), overrides: osmId };
+}
+
+// Masquage d'un radar OSM qui n'existe plus.
+export function buildHiddenRow({ id, osmId, kind, lat, lon, controls = null }) {
+  return {
+    id, kind, lat, lon, directions: [], maxspeed: null,
+    controls: kind === 'camera' ? (controls ?? 'speed') : null, note: null, expires_at: null, overrides: osmId, hidden: true,
+  };
+}
+
+const CARDINALS = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ouest', 'ouest', 'nord-ouest'];
+export function cardinalFr(bearing) {
+  const b = ((bearing % 360) + 360) % 360;
+  return CARDINALS[Math.round(b / 45) % 8];
+}
+
+// Zones de l'éditeur → GeoJSON (coordonnées [lon, lat]) pour les tracer sur la carte.
+export function zoneFeatures(rows) {
+  const features = [];
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (r?.kind !== 'average_zone' || r.hidden || r.overrides) continue;
+    if (!Array.isArray(r.path) || r.path.length < 2 || !r.path.every((p) => Array.isArray(p) && isNum(p[0]) && isNum(p[1]))) continue;
+    features.push({
+      type: 'Feature', properties: { id: r.id },
+      geometry: { type: 'LineString', coordinates: r.path.map(([lat, lon]) => [lon, lat]) },
+    });
+  }
+  return { type: 'FeatureCollection', features };
 }
